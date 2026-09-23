@@ -1070,7 +1070,7 @@ export default function Dashboard() {
             ["overview", "Overview", <TrendingUp size={14} />],
             ["trades", `Trade Log (${trades.length})`, <Briefcase size={14} />],
             ["capital", "Capital & Ledger", <Wallet size={14} />],
-            ["investments", `Holdings (${holdings.length})`, <PiggyBank size={14} />],
+            ["investments", `Equity Investments (${holdings.length})`, <Briefcase size={14} />],
             ["discipline", "Discipline", <ShieldCheck size={14} />],
             ["plan20cr", "🎯 ₹20 Cr Plan", <Target size={14} />],
           ].map(([key, label, icon]) => (
@@ -2390,204 +2390,600 @@ function CapitalTab({ startingCapital, setStartingCapital, ledger, stats, openNe
   );
 }
 
+function calcHoldingXIRR(dateStr, invested, curVal) {
+  if (!dateStr || invested <= 0 || curVal <= 0) return null;
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (isNaN(d.getTime())) return null;
+  const days = Math.max(1, (now - d) / (1000 * 60 * 60 * 24));
+  if (days < 5) {
+    return ((curVal - invested) / invested) * 100;
+  }
+  const ratio = curVal / invested;
+  const annualRate = (Math.pow(ratio, 365 / days) - 1) * 100;
+  if (!isFinite(annualRate) || isNaN(annualRate)) return null;
+  return annualRate;
+}
+
 // Equity Investments Tab Component
 function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding, deleteHolding, updateHoldingPrice }) {
+  const [search, setSearch] = useState("");
+  const [capFilter, setCapFilter] = useState("ALL");
+  const [valFilter, setValFilter] = useState("ALL");
+
+  const totalInvested = stats?.holdingsInvested || 0;
+  const totalCurVal = stats?.holdingsCurrentValue || 0;
+  const totalUnrealized = stats?.holdingsUnrealized || 0;
+  const totalReturnPct = totalInvested > 0 ? (totalUnrealized / totalInvested) * 100 : 0;
+  const portfolioXIRR = stats?.equityXIRR ?? null;
+
+  // Filtered holdings
+  const filteredHoldings = useMemo(() => {
+    return holdings.filter(h => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        q === "" ||
+        (h.stock && h.stock.toLowerCase().includes(q)) ||
+        (h.companyName && h.companyName.toLowerCase().includes(q)) ||
+        (h.investmentNote && h.investmentNote.toLowerCase().includes(q));
+
+      const matchesCap = capFilter === "ALL" || h.companySize === capFilter;
+      const matchesVal = valFilter === "ALL" || h.valuationView === valFilter;
+      return matchesSearch && matchesCap && matchesVal;
+    });
+  }, [holdings, search, capFilter, valFilter]);
+
+  // Market cap allocation
+  const capAllocation = useMemo(() => {
+    if (totalInvested <= 0) return { large: 0, mid: 0, small: 0, other: 0 };
+    let large = 0, mid = 0, small = 0, other = 0;
+    holdings.forEach(h => {
+      const cost = (Number(h.qty) || 0) * (Number(h.buyPrice) || 0);
+      const cap = h.companySize || "Large cap";
+      if (cap.toLowerCase().includes("large")) large += cost;
+      else if (cap.toLowerCase().includes("mid")) mid += cost;
+      else if (cap.toLowerCase().includes("small")) small += cost;
+      else other += cost;
+    });
+    return {
+      large: Math.round((large / totalInvested) * 100),
+      mid: Math.round((mid / totalInvested) * 100),
+      small: Math.round((small / totalInvested) * 100),
+      other: Math.round((other / totalInvested) * 100),
+    };
+  }, [holdings, totalInvested]);
+
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <MetricSummaryCard label="Total Invested" value={fmtINR(stats.holdingsInvested)} icon={<Briefcase size={16} />} customColor="var(--color-gold)" />
-        <MetricSummaryCard label="Current Portfolio Value" value={fmtINR(stats.holdingsCurrentValue)} icon={<Wallet size={16} />} />
-        <MetricSummaryCard label="Unrealized P&L" value={fmtSigned(stats.holdingsUnrealized)} isPnl val={stats.holdingsUnrealized} icon={stats.holdingsUnrealized >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />} />
-        <MetricSummaryCard label="Equity XIRR %" value={fmtPct(stats.equityXIRR)} isPnl val={stats.equityXIRR} icon={<Percent size={16} />} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* 1. Top Portfolio Metric Summary Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+        <MetricSummaryCard
+          label="Total Equity Invested"
+          value={fmtINR(totalInvested)}
+          icon={<Briefcase size={16} />}
+          customColor="var(--color-gold)"
+        />
+        <MetricSummaryCard
+          label="Current Portfolio Value"
+          value={fmtINR(totalCurVal)}
+          icon={<Wallet size={16} />}
+        />
+        <MetricSummaryCard
+          label="Total Unrealized P&L"
+          value={fmtSigned(totalUnrealized)}
+          isPnl
+          val={totalUnrealized}
+          icon={totalUnrealized >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+        />
+        <MetricSummaryCard
+          label="Portfolio Equity XIRR %"
+          value={fmtPct(portfolioXIRR)}
+          isPnl
+          val={portfolioXIRR}
+          icon={<Percent size={16} />}
+          customColor={portfolioXIRR >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"}
+        />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
-            Equity Portfolio Holdings ({holdings.length})
+      {/* 2. Executive Overview & Allocation Banner */}
+      <div
+        className="glass-card"
+        style={{
+          padding: "18px 22px",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)" }}>
+                Equity Portfolio Strategy & Allocation
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-gold)",
+                  background: "var(--color-gold-soft)",
+                  border: "1px solid var(--color-gold-border)",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                }}
+              >
+                100% FUNDED BY PROFITS
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 640 }}>
+              All holdings below are permanent equity investments created from disciplined options trading withdrawals. Holding-level <strong>XIRR %</strong> tracks your true annualized compounding velocity from trade settlement to date.
+            </div>
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-            Long-term wealth generated by compounding trading profits into high-conviction stocks
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Portfolio Return</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color: totalUnrealized >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                {fmtPct(totalReturnPct)}
+              </div>
+            </div>
+            <button
+              onClick={openNewHoldingForm}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                color: "#0F172A", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(245, 158, 11, 0.3)"
+              }}
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              Add Stock Investment
+            </button>
           </div>
         </div>
-        <button
-          onClick={openNewHoldingForm}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
-          }}
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          Add Holding
-        </button>
-      </div>
 
-      {/* Mobile View: Holdings Cards */}
-      <div className="mobile-only" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {holdings.map(h => {
-          const qty = Number(h.qty) || 0;
-          const buy = Number(h.buyPrice) || 0;
-          const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
-          const invested = qty * buy;
-          const curVal = qty * cp;
-          const pnl = curVal - invested;
-          const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-
-          return (
-            <div key={h.id} className="glass-card" style={{ padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</span>
-                    <span style={{
-                      fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                      background: "var(--bg-elevated)", color: "var(--color-gold)", fontWeight: 700
-                    }}>{h.exchange || "NSE"}</span>
-                    {h.companySize && (
-                      <span style={{
-                        fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                        background: "var(--bg-elevated)", color: "var(--text-muted)"
-                      }}>{h.companySize}</span>
-                    )}
-                  </div>
-                  {h.companyName && h.companyName !== h.stock && (
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{h.companyName}</div>
-                  )}
-                  <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                    Purchased {fmtDate(h.date)}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }}><Pencil size={14} /></button>
-                  <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }}><Trash2 size={14} /></button>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10, fontSize: 12 }}>
-                <div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Qty · Buy Price</div>
-                  <div className="mono" style={{ fontWeight: 600 }}>{qty} @ {fmtINR(buy)}</div>
-                </div>
-                <div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Total Invested</div>
-                  <div className="mono" style={{ fontWeight: 600 }}>{fmtINR(invested)}</div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>CMP:</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={h.currentPrice}
-                    placeholder={String(buy)}
-                    onChange={e => updateHoldingPrice(h.id, e.target.value)}
-                    style={{ width: 85, padding: "3px 6px", fontSize: 12, minHeight: 28 }}
-                  />
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
-                    {fmtSigned(pnl)} ({fmtPct(pnlPct)})
-                  </div>
-                </div>
-              </div>
-
-              {(h.peRatio || h.beta || h.valuationView || h.investmentNote) && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)", fontSize: 11, color: "var(--text-secondary)" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: h.investmentNote ? 4 : 0 }}>
-                    {h.peRatio && <span>P/E: <b>{h.peRatio}</b></span>}
-                    {h.beta && <span>Beta: <b>{h.beta}</b></span>}
-                    {h.valuationView && <span>View: <b style={{ color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)" }}>{h.valuationView}</b></span>}
-                  </div>
-                  {h.investmentNote && (
-                    <div style={{ fontStyle: "italic", color: "var(--text-muted)", marginTop: 2 }}>
-                      "{h.investmentNote}"
-                    </div>
-                  )}
-                </div>
-              )}
+        {/* Market Cap Allocation Bar */}
+        {totalInvested > 0 && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 6 }}>
+              <span>Market Cap Allocation: Large Cap ({capAllocation.large}%) · Mid Cap ({capAllocation.mid}%) · Small Cap ({capAllocation.small}%)</span>
+              <span className="mono" style={{ color: "var(--color-gold)", fontWeight: 600 }}>{holdings.length} Active Positions</span>
             </div>
-          );
-        })}
+            <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--bg-elevated)" }}>
+              <div style={{ width: `${capAllocation.large}%`, background: "var(--color-gold)" }} title={`Large Cap: ${capAllocation.large}%`} />
+              <div style={{ width: `${capAllocation.mid}%`, background: "var(--color-win-text)" }} title={`Mid Cap: ${capAllocation.mid}%`} />
+              <div style={{ width: `${capAllocation.small}%`, background: "#818CF8" }} title={`Small Cap: ${capAllocation.small}%`} />
+              <div style={{ width: `${capAllocation.other}%`, background: "var(--text-muted)" }} title={`Other: ${capAllocation.other}%`} />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Desktop View: Holdings Table */}
-      <div className="desktop-only glass-card" style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
-              {["Date", "Stock & Company", "Exchange / Cap", "Qty", "Buy Price", "Invested", "Current Price", "Current Value", "P&L", "Return %", "Research / Notes", ""].map(h => (
-                <th key={h} style={{ padding: "12px 14px", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {holdings.map(h => {
-              const qty = Number(h.qty) || 0;
-              const buy = Number(h.buyPrice) || 0;
-              const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
-              const invested = qty * buy;
-              const curVal = qty * cp;
-              const pnl = curVal - invested;
-              const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+      {/* 3. Search & Filter Bar */}
+      <div
+        className="glass-card"
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          alignItems: "center",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 240px", minWidth: 200, background: "var(--bg-input)", border: "1px solid var(--border-input)", borderRadius: 8, padding: "0 10px" }}>
+          <Search size={14} color="var(--text-muted)" />
+          <input
+            type="text"
+            placeholder="Search symbol, company name, or investment thesis..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "8px 0",
+              fontSize: 13,
+              color: "var(--text-main)",
+              outline: "none",
+              minHeight: 36,
+            }}
+          />
+        </div>
 
-              return (
-                <tr key={h.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                  <td className="mono" style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{fmtDate(h.date)}</td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <div style={{ fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</div>
-                    {h.companyName && h.companyName !== h.stock && (
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{h.companyName}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <span style={{
-                        padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700,
-                        background: "var(--bg-elevated)", color: "var(--color-gold)"
-                      }}>{h.exchange || "NSE"}</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Market Cap:</span>
+          <select
+            value={capFilter}
+            onChange={(e) => setCapFilter(e.target.value)}
+            style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, minHeight: 36, width: "auto" }}
+          >
+            <option value="ALL">All Market Caps</option>
+            <option value="Large cap">Large cap</option>
+            <option value="Mid cap">Mid cap</option>
+            <option value="Small cap">Small cap</option>
+            <option value="Micro cap">Micro cap</option>
+          </select>
+
+          <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 4 }}>Valuation:</span>
+          <select
+            value={valFilter}
+            onChange={(e) => setValFilter(e.target.value)}
+            style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, minHeight: 36, width: "auto" }}
+          >
+            <option value="ALL">All Valuations</option>
+            <option value="Undervalued">Undervalued</option>
+            <option value="Fair">Fair</option>
+            <option value="Overvalued">Overvalued</option>
+            <option value="Needs review">Needs review</option>
+          </select>
+
+          {(search || capFilter !== "ALL" || valFilter !== "ALL") && (
+            <button
+              onClick={() => { setSearch(""); setCapFilter("ALL"); setValFilter("ALL"); }}
+              style={{
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Mobile Cards: Descriptive Holding Cards */}
+      <div className="mobile-only" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {filteredHoldings.length === 0 ? (
+          <div className="glass-card" style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
+            No equity investments match your filter criteria.
+          </div>
+        ) : (
+          filteredHoldings.map(h => {
+            const qty = Number(h.qty) || 0;
+            const buy = Number(h.buyPrice) || 0;
+            const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
+            const invested = qty * buy;
+            const curVal = qty * cp;
+            const pnl = curVal - invested;
+            const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+            const holdingXIRR = calcHoldingXIRR(h.date, invested, curVal);
+            const daysHeld = h.date ? Math.max(0, Math.round((new Date() - new Date(h.date)) / (1000 * 60 * 60 * 24))) : 0;
+
+            return (
+              <div key={h.id} className="glass-card" style={{ padding: 16 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span className="mono" style={{ fontSize: 17, fontWeight: 800, color: "var(--color-gold)" }}>{h.stock}</span>
+                      <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-elevated)", color: "var(--color-gold)", fontWeight: 700 }}>
+                        {h.exchange || "NSE"}
+                      </span>
                       {h.companySize && (
+                        <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-elevated)", color: "var(--text-secondary)", fontWeight: 600 }}>
+                          {h.companySize}
+                        </span>
+                      )}
+                      {h.valuationView && (
                         <span style={{
-                          padding: "2px 6px", borderRadius: 4, fontSize: 10,
-                          background: "var(--bg-elevated)", color: "var(--text-secondary)"
-                        }}>{h.companySize}</span>
+                          fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 700,
+                          background: h.valuationView === "Undervalued" ? "var(--color-win-soft)" : h.valuationView === "Overvalued" ? "var(--color-loss-soft)" : "rgba(245, 158, 11, 0.12)",
+                          color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)",
+                          border: `1px solid ${h.valuationView === "Undervalued" ? "var(--color-win-border)" : h.valuationView === "Overvalued" ? "var(--color-loss-border)" : "var(--color-gold-border)"}`,
+                        }}>
+                          {h.valuationView}
+                        </span>
                       )}
                     </div>
-                  </td>
-                  <td className="mono" style={{ padding: "11px 14px" }}>{qty}</td>
-                  <td className="mono" style={{ padding: "11px 14px" }}>{fmtINR(buy)}</td>
-                  <td className="mono" style={{ padding: "11px 14px" }}>{fmtINR(invested)}</td>
-                  <td style={{ padding: "11px 14px" }}>
+                    {h.companyName && h.companyName !== h.stock && (
+                      <div style={{ fontSize: 13, color: "var(--text-main)", fontWeight: 600, marginTop: 3 }}>
+                        {h.companyName}
+                      </div>
+                    )}
+                    <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                      Purchased {fmtDate(h.date)} · {daysHeld} days held
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }} title="Edit"><Pencil size={15} /></button>
+                    <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }} title="Delete"><Trash2 size={15} /></button>
+                  </div>
+                </div>
+
+                {/* Key Metrics Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 10, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Qty · Purchase Price</div>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
+                      {qty} @ {fmtINR(buy)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Total Cost Basis</div>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
+                      {fmtINR(invested)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Current Value</div>
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                      {fmtINR(curVal)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Unrealized P&L</div>
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginTop: 2 }}>
+                      {fmtSigned(pnl)} ({fmtPct(pnlPct)})
+                    </div>
+                  </div>
+                </div>
+
+                {/* CMP Quick Updater + Individual Stock XIRR Badge */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(245, 158, 11, 0.04)", borderRadius: 10, border: "1px solid var(--border-subtle)", marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>Current Price (CMP):</span>
                     <input
                       type="number"
                       step="0.05"
                       value={h.currentPrice}
                       placeholder={String(buy)}
                       onChange={e => updateHoldingPrice(h.id, e.target.value)}
-                      style={{ width: 90, padding: "5px 8px", fontSize: 13, minHeight: 32 }}
+                      style={{ width: 90, padding: "5px 8px", fontSize: 13, minHeight: 32, fontFamily: "var(--font-mono)", fontWeight: 700 }}
                     />
-                  </td>
-                  <td className="mono" style={{ padding: "11px 14px", fontWeight: 600 }}>{fmtINR(curVal)}</td>
-                  <td className="mono" style={{ padding: "11px 14px", fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>{fmtSigned(pnl)}</td>
-                  <td className="mono" style={{ padding: "11px 14px", color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>{fmtPct(pnlPct)}</td>
-                  <td style={{ padding: "11px 14px", maxWidth: 180 }}>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {h.valuationView && <span style={{ color: "var(--color-gold)", marginRight: 4 }}>[{h.valuationView}]</span>}
-                      {h.investmentNote || "—"}
+                  </div>
+
+                  {/* Individual Stock XIRR */}
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Holding XIRR</div>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: (holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
+                      }}
+                    >
+                      {holdingXIRR !== null ? `${fmtPct(holdingXIRR)} p.a.` : "—"}
                     </div>
-                  </td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }} title="Edit"><Pencil size={14} /></button>
-                      <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }} title="Delete"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+
+                {/* Fundamentals: P/E, Beta, Dividend */}
+                {(h.peRatio || h.beta || h.dividendDate || h.dividendPerShare) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--border-subtle)" }}>
+                    {h.peRatio && <span>P/E Ratio: <strong style={{ color: "var(--text-main)" }}>{h.peRatio}</strong></span>}
+                    {h.beta && <span>Beta: <strong style={{ color: "var(--text-main)" }}>{h.beta}</strong></span>}
+                    {h.dividendPerShare && <span>Div/Share: <strong style={{ color: "var(--color-win-text)" }}>₹{h.dividendPerShare}</strong></span>}
+                    {h.dividendDate && <span>Next Div: <strong style={{ color: "var(--text-main)" }}>{fmtDate(h.dividendDate)}</strong></span>}
+                  </div>
+                )}
+
+                {/* Descriptive Investment Thesis & Catalyst Note */}
+                {h.investmentNote && (
+                  <div style={{ background: "var(--bg-elevated)", padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid var(--color-gold)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+                      Investment Thesis & Notes {h.newsDate ? `(${fmtDate(h.newsDate)})` : ""}
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
+                    <div style={{ fontSize: 12, color: "var(--text-main)", lineHeight: 1.5, fontStyle: "italic" }}>
+                      "{h.investmentNote}"
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 5. Desktop View: Comprehensive Descriptive Holdings Table */}
+      <div className="desktop-only glass-card" style={{ overflowX: "auto", border: "1px solid var(--border-card)" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Stock & Company</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Valuation View</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Purchase Date</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Qty</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Buy Price</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Total Invested</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Current Price (CMP)</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Current Value</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Unrealized P&L</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Return %</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", color: "var(--color-gold)" }}>Holding XIRR</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Fundamentals & Notes</th>
+              <th style={{ padding: "12px 14px" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredHoldings.length === 0 ? (
+              <tr>
+                <td colSpan={13} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>
+                  No equity investments match your filter criteria.
+                </td>
+              </tr>
+            ) : (
+              filteredHoldings.map(h => {
+                const qty = Number(h.qty) || 0;
+                const buy = Number(h.buyPrice) || 0;
+                const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
+                const invested = qty * buy;
+                const curVal = qty * cp;
+                const pnl = curVal - invested;
+                const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                const holdingXIRR = calcHoldingXIRR(h.date, invested, curVal);
+                const daysHeld = h.date ? Math.max(0, Math.round((new Date() - new Date(h.date)) / (1000 * 60 * 60 * 24))) : 0;
+
+                return (
+                  <tr key={h.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                    {/* Stock & Company */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
+                        <span style={{
+                          padding: "2px 5px", borderRadius: 4, fontSize: 10, fontWeight: 700,
+                          background: "var(--bg-elevated)", color: "var(--color-gold)"
+                        }}>{h.exchange || "NSE"}</span>
+                        {h.companySize && (
+                          <span style={{
+                            padding: "2px 5px", borderRadius: 4, fontSize: 10,
+                            background: "var(--bg-elevated)", color: "var(--text-secondary)"
+                          }}>{h.companySize}</span>
+                        )}
+                      </div>
+                      {h.companyName && h.companyName !== h.stock && (
+                        <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2, maxWidth: 180, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {h.companyName}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Valuation View */}
+                    <td style={{ padding: "12px 14px" }}>
+                      {h.valuationView ? (
+                        <span style={{
+                          padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                          background: h.valuationView === "Undervalued" ? "var(--color-win-soft)" : h.valuationView === "Overvalued" ? "var(--color-loss-soft)" : "rgba(245, 158, 11, 0.12)",
+                          color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)",
+                          border: `1px solid ${h.valuationView === "Undervalued" ? "var(--color-win-border)" : h.valuationView === "Overvalued" ? "var(--color-loss-border)" : "var(--color-gold-border)"}`,
+                        }}>
+                          {h.valuationView}
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* Purchase Date & Age */}
+                    <td className="mono" style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      <div>{fmtDate(h.date)}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{daysHeld}d held</div>
+                    </td>
+
+                    {/* Qty */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600 }}>
+                      {qty}
+                    </td>
+
+                    {/* Buy Price */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right" }}>
+                      {fmtINR(buy)}
+                    </td>
+
+                    {/* Total Invested */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700 }}>
+                      {fmtINR(invested)}
+                    </td>
+
+                    {/* Current Market Price (CMP) Inline Quick Updater */}
+                    <td style={{ padding: "12px 14px", textAlign: "center" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>₹</span>
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={h.currentPrice}
+                          placeholder={String(buy)}
+                          onChange={e => updateHoldingPrice(h.id, e.target.value)}
+                          style={{
+                            width: 85,
+                            padding: "4px 6px",
+                            fontSize: 13,
+                            minHeight: 28,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 700,
+                            color: "var(--text-main)",
+                            background: "transparent",
+                            border: "none",
+                            outline: "none"
+                          }}
+                          title="Click to edit CMP directly"
+                        />
+                      </div>
+                      {h.priceUpdatedOn && (
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                          Updated {fmtDate(h.priceUpdatedOn)}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Current Value */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-main)" }}>
+                      {fmtINR(curVal)}
+                    </td>
+
+                    {/* Unrealized P&L */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                      {fmtSigned(pnl)}
+                    </td>
+
+                    {/* Return % */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                      {fmtPct(pnlPct)}
+                    </td>
+
+                    {/* Individual Stock Holding XIRR % */}
+                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right" }}>
+                      <div
+                        style={{
+                          display: "inline-block",
+                          padding: "3px 8px",
+                          borderRadius: 6,
+                          fontWeight: 800,
+                          fontSize: 12,
+                          background: (holdingXIRR || 0) >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                          color: (holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
+                          border: `1px solid ${(holdingXIRR || 0) >= 0 ? "var(--color-win-border)" : "var(--color-loss-border)"}`,
+                        }}
+                      >
+                        {holdingXIRR !== null ? `${fmtPct(holdingXIRR)}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: "var(--text-muted)", marginTop: 2 }}>p.a.</div>
+                    </td>
+
+                    {/* Fundamentals & Research Thesis */}
+                    <td style={{ padding: "12px 14px", maxWidth: 220 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, marginBottom: 3 }}>
+                        {h.peRatio && <span>P/E: <b>{h.peRatio}</b></span>}
+                        {h.beta && <span>Beta: <b>{h.beta}</b></span>}
+                        {h.dividendPerShare && <span style={{ color: "var(--color-win-text)" }}>Div: <b>₹{h.dividendPerShare}</b></span>}
+                      </div>
+                      {h.investmentNote ? (
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: "var(--text-secondary)",
+                            fontStyle: "italic",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={h.investmentNote}
+                        >
+                          "{h.investmentNote}"
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>No thesis notes</span>
+                      )}
+                    </td>
+
+                    {/* Action Buttons */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }} title="Edit Full Details"><Pencil size={15} /></button>
+                        <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 4 }} title="Delete"><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
