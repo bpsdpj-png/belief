@@ -24,10 +24,5 @@
     "pg": "^8.23.0",
     "rollup": "npm:@rollup/wasm-node@4.63.4",
     "vite": "^6.2.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "rollup": "npm:@rollup/wasm-node@4.63.4"
-    }
   }
 }
