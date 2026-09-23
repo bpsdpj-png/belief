@@ -42,8 +42,12 @@ export function mapLedgerFromDb(row) {
     id: row.id,
     date: row.date,
     type: row.type,
+    withdrawalUse: row.withdrawal_use || (row.type === 'Investment' ? 'stock' : 'cash'),
+    stockSymbol: row.stock_symbol || '',
+    holdingId: row.holding_id || null,
     amount: row.amount !== null && row.amount !== undefined ? String(row.amount) : '',
     note: row.note || '',
+    metadata: row.metadata || {},
   };
 }
 
@@ -53,8 +57,12 @@ export function mapLedgerToDb(entry) {
     id: entry.id,
     date: entry.date,
     type: entry.type,
+    withdrawal_use: entry.withdrawalUse || (entry.type === 'Investment' ? 'stock' : 'cash'),
+    stock_symbol: entry.stockSymbol || '',
+    holding_id: entry.holdingId || null,
     amount: entry.amount !== '' ? Number(entry.amount) : 0,
     note: entry.note || '',
+    metadata: entry.metadata || {},
     updated_at: new Date().toISOString(),
   };
 }
@@ -64,10 +72,23 @@ export function mapHoldingFromDb(row) {
   return {
     id: row.id,
     date: row.date,
-    stock: row.stock,
+    stock: row.stock || '',
+    companyName: row.company_name || '',
+    exchange: row.exchange || 'NSE',
     qty: row.qty !== null && row.qty !== undefined ? String(row.qty) : '',
     buyPrice: row.buy_price !== null && row.buy_price !== undefined ? String(row.buy_price) : '',
     currentPrice: row.current_price !== null && row.current_price !== undefined ? String(row.current_price) : '',
+    priceUpdatedOn: row.price_updated_on || row.date,
+    peRatio: row.pe_ratio !== null && row.pe_ratio !== undefined ? String(row.pe_ratio) : '',
+    beta: row.beta !== null && row.beta !== undefined ? String(row.beta) : '',
+    companySize: row.company_size || 'Large cap',
+    valuationView: row.valuation_view || 'Needs review',
+    dividendDate: row.dividend_date || '',
+    dividendPerShare: row.dividend_per_share !== null && row.dividend_per_share !== undefined ? String(row.dividend_per_share) : '',
+    investmentNote: row.investment_note || '',
+    newsDate: row.news_date || '',
+    ledgerId: row.ledger_id || null,
+    metadata: row.metadata || {},
   };
 }
 
@@ -77,9 +98,22 @@ export function mapHoldingToDb(holding) {
     id: holding.id,
     date: holding.date,
     stock: holding.stock,
+    company_name: holding.companyName || '',
+    exchange: holding.exchange || 'NSE',
     qty: holding.qty !== '' ? Number(holding.qty) : 0,
     buy_price: holding.buyPrice !== '' ? Number(holding.buyPrice) : 0,
     current_price: holding.currentPrice !== '' && holding.currentPrice !== null ? Number(holding.currentPrice) : null,
+    price_updated_on: holding.priceUpdatedOn || holding.date,
+    pe_ratio: holding.peRatio !== '' && holding.peRatio != null ? Number(holding.peRatio) : null,
+    beta: holding.beta !== '' && holding.beta != null ? Number(holding.beta) : null,
+    company_size: holding.companySize || 'Large cap',
+    valuation_view: holding.valuationView || 'Needs review',
+    dividend_date: holding.dividendDate || null,
+    dividend_per_share: holding.dividendPerShare !== '' && holding.dividendPerShare != null ? Number(holding.dividendPerShare) : null,
+    investment_note: holding.investmentNote || '',
+    news_date: holding.newsDate || null,
+    ledger_id: holding.ledgerId || null,
+    metadata: holding.metadata || {},
     updated_at: new Date().toISOString(),
   };
 }

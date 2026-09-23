@@ -104,21 +104,55 @@ const emptyTrade = () => ({
   notes: "",
 });
 
+const emptyStockDetails = () => ({
+  companyName: "",
+  stock: "",
+  exchange: "NSE",
+  qty: "",
+  buyPrice: "",
+  currentPrice: "",
+  priceUpdatedOn: todayLocalISO(),
+  peRatio: "",
+  beta: "",
+  companySize: "Large cap",
+  valuationView: "Needs review",
+  dividendDate: "",
+  dividendPerShare: "",
+  investmentNote: "",
+  newsDate: "",
+});
+
 const emptyLedger = () => ({
   id: crypto.randomUUID(),
   date: todayLocalISO(),
   type: "Deposit",
+  withdrawalUse: "cash", // "cash" or "stock"
   amount: "",
   note: "",
+  stockSymbol: "",
+  holdingId: null,
+  stockDetails: emptyStockDetails(),
 });
 
 const emptyHolding = () => ({
   id: crypto.randomUUID(),
   date: todayLocalISO(),
   stock: "",
+  companyName: "",
+  exchange: "NSE",
   qty: "",
   buyPrice: "",
   currentPrice: "",
+  priceUpdatedOn: todayLocalISO(),
+  peRatio: "",
+  beta: "",
+  companySize: "Large cap",
+  valuationView: "Needs review",
+  dividendDate: "",
+  dividendPerShare: "",
+  investmentNote: "",
+  newsDate: "",
+  deductFromTradingCapital: true,
 });
 
 const fmtINR = (n) => {
@@ -284,8 +318,9 @@ export default function Dashboard() {
     const netOf = (t) => (Number(t.gross) || 0) - (Number(t.charges) || 0);
     const totalNet = trades.reduce((s, t) => s + netOf(t), 0);
     const deposits = ledger.filter(l => l.type === "Deposit").reduce((s, l) => s + (Number(l.amount) || 0), 0);
-    const withdrawals = ledger.filter(l => l.type === "Withdrawal").reduce((s, l) => s + (Number(l.amount) || 0), 0);
-    const legacyInvestments = ledger.filter(l => l.type === "Investment").reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const cashWithdrawn = ledger.filter(l => l.type === "Withdrawal" && (l.withdrawalUse === "cash" || !l.withdrawalUse)).reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const movedIntoStocks = ledger.filter(l => l.type === "Investment" || (l.type === "Withdrawal" && l.withdrawalUse === "stock")).reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const totalWithdrawals = cashWithdrawn + movedIntoStocks;
 
     const holdingsInvested = holdings.reduce((s, h) => s + (Number(h.qty) || 0) * (Number(h.buyPrice) || 0), 0);
     const holdingsCurrentValue = holdings.reduce((s, h) => {
@@ -293,10 +328,11 @@ export default function Dashboard() {
       return s + (Number(h.qty) || 0) * cp;
     }, 0);
     const holdingsUnrealized = holdingsCurrentValue - holdingsInvested;
-    const totalInvestedOut = legacyInvestments + holdingsInvested;
+    const totalInvestedOut = Math.max(movedIntoStocks, holdingsInvested);
 
-    const currentCapital = startingCapital + deposits - withdrawals - totalInvestedOut + totalNet;
+    const currentCapital = startingCapital + deposits - cashWithdrawn - totalInvestedOut + totalNet;
     const capitalBase = startingCapital + deposits;
+    const netCapitalAdded = deposits - cashWithdrawn - movedIntoStocks;
     const overallROI = capitalBase > 0 ? (totalNet / capitalBase) * 100 : 0;
 
     const today = todayLocalISO();
@@ -437,7 +473,7 @@ export default function Dashboard() {
     return {
       totalNet, currentCapital, overallROI, dailyROI, monthlyROI, todayPnl, monthNet,
       winRate, avgWin, avgLoss, profitFactor, discipline, curve, maxDD, consistency, avgDailyPnl, avgDailyROI, streak, streakType,
-      monthly, weekly, deposits, withdrawals, capitalBase, tradeCount: trades.length,
+      monthly, weekly, deposits, withdrawals: totalWithdrawals, cashWithdrawn, movedIntoStocks, netCapitalAdded, capitalBase, tradeCount: trades.length,
       winCount: wins.length, lossCount: losses.length,
       holdingsInvested, holdingsCurrentValue, holdingsUnrealized, equityXIRR, tradingXIRR,
       totalInvestedOut, strategyPerf,
@@ -501,19 +537,155 @@ export default function Dashboard() {
   };
 
   // Ledger actions
+  // Helper to update stock detail in ledgerDraft
+  const updateLedgerStockDetail = (field, val) => {
+    setLedgerDraft(prev => {
+      const nextStock = { ...(prev.stockDetails || emptyStockDetails()), [field]: val };
+      let newAmount = prev.amount;
+      if (field === "qty" || field === "buyPrice") {
+        const q = field === "qty" ? Number(val) : Number(nextStock.qty);
+        const p = field === "buyPrice" ? Number(val) : Number(nextStock.buyPrice);
+        if (q > 0 && p > 0) {
+          newAmount = String(q * p);
+        }
+      }
+      return {
+        ...prev,
+        stockDetails: nextStock,
+        amount: newAmount,
+      };
+    });
+  };
+
+  // Ledger actions
+  const startEditLedger = (l) => {
+    let stockDetails = emptyStockDetails();
+    const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
+    if (isStock) {
+      const linked = holdings.find(h => (l.holdingId && h.id === l.holdingId) || (l.stockSymbol && h.stock === l.stockSymbol));
+      if (linked) {
+        stockDetails = {
+          companyName: linked.companyName || linked.stock || "",
+          stock: linked.stock || "",
+          exchange: linked.exchange || "NSE",
+          qty: linked.qty || "",
+          buyPrice: linked.buyPrice || "",
+          currentPrice: linked.currentPrice || "",
+          priceUpdatedOn: linked.priceUpdatedOn || linked.date,
+          peRatio: linked.peRatio || "",
+          beta: linked.beta || "",
+          companySize: linked.companySize || "Large cap",
+          valuationView: linked.valuationView || "Needs review",
+          dividendDate: linked.dividendDate || "",
+          dividendPerShare: linked.dividendPerShare || "",
+          investmentNote: linked.investmentNote || "",
+          newsDate: linked.newsDate || "",
+        };
+      } else if (l.stockSymbol) {
+        stockDetails.stock = l.stockSymbol;
+      }
+    }
+
+    setLedgerDraft({
+      id: l.id,
+      date: l.date,
+      type: l.type === "Investment" ? "Withdrawal" : l.type,
+      withdrawalUse: l.type === "Investment" ? "stock" : (l.withdrawalUse || "cash"),
+      amount: l.amount || "",
+      note: l.note || "",
+      stockSymbol: l.stockSymbol || "",
+      holdingId: l.holdingId || null,
+      stockDetails,
+    });
+    setEditingLedgerId(l.id);
+    setShowLedgerForm(true);
+  };
+
+  const cancelLedgerForm = () => {
+    setShowLedgerForm(false);
+    setEditingLedgerId(null);
+    setLedgerDraft(emptyLedger());
+  };
+
   const addLedger = async () => {
     setSaveState("saving");
     try {
+      const isStockInvestment = ledgerDraft.type === "Withdrawal" && ledgerDraft.withdrawalUse === "stock";
+      let amountNum = Number(ledgerDraft.amount) || 0;
+
+      if (isStockInvestment && ledgerDraft.stockDetails?.qty && ledgerDraft.stockDetails?.buyPrice) {
+        const computed = (Number(ledgerDraft.stockDetails.qty) || 0) * (Number(ledgerDraft.stockDetails.buyPrice) || 0);
+        if (!amountNum && computed > 0) {
+          amountNum = computed;
+        }
+      }
+
+      const ledgerId = editingLedgerId || ledgerDraft.id || crypto.randomUUID();
+      let holdingId = ledgerDraft.holdingId || null;
+
+      // If stock investment, sync to holdings
+      if (isStockInvestment && (ledgerDraft.stockDetails?.stock || ledgerDraft.stockDetails?.companyName)) {
+        const stockSymbol = (ledgerDraft.stockDetails.stock || ledgerDraft.stockDetails.companyName).toUpperCase().trim();
+        const existingHolding = holdings.find(h => (holdingId && h.id === holdingId) || h.ledgerId === ledgerId || h.stock === stockSymbol);
+        const resolvedHoldingId = existingHolding ? existingHolding.id : (holdingId || crypto.randomUUID());
+        holdingId = resolvedHoldingId;
+
+        const holdingObj = {
+          id: resolvedHoldingId,
+          date: ledgerDraft.date,
+          stock: stockSymbol,
+          companyName: ledgerDraft.stockDetails.companyName || stockSymbol,
+          exchange: ledgerDraft.stockDetails.exchange || "NSE",
+          qty: ledgerDraft.stockDetails.qty || "",
+          buyPrice: ledgerDraft.stockDetails.buyPrice || "",
+          currentPrice: ledgerDraft.stockDetails.currentPrice !== "" ? ledgerDraft.stockDetails.currentPrice : ledgerDraft.stockDetails.buyPrice,
+          priceUpdatedOn: ledgerDraft.stockDetails.priceUpdatedOn || ledgerDraft.date,
+          peRatio: ledgerDraft.stockDetails.peRatio || "",
+          beta: ledgerDraft.stockDetails.beta || "",
+          companySize: ledgerDraft.stockDetails.companySize || "Large cap",
+          valuationView: ledgerDraft.stockDetails.valuationView || "Needs review",
+          dividendDate: ledgerDraft.stockDetails.dividendDate || "",
+          dividendPerShare: ledgerDraft.stockDetails.dividendPerShare || "",
+          investmentNote: ledgerDraft.stockDetails.investmentNote || "",
+          newsDate: ledgerDraft.stockDetails.newsDate || "",
+          ledgerId: ledgerId,
+        };
+
+        setHoldings(prev => {
+          const idx = prev.findIndex(h => h.id === resolvedHoldingId);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = holdingObj;
+            return next;
+          }
+          return [...prev, holdingObj];
+        });
+
+        if (dbStatus.tablesReady) {
+          await persistHolding(holdingObj);
+        }
+      }
+
+      const ledgerObj = {
+        id: ledgerId,
+        date: ledgerDraft.date,
+        type: ledgerDraft.type,
+        withdrawalUse: ledgerDraft.type === "Withdrawal" ? (ledgerDraft.withdrawalUse || "cash") : "cash",
+        amount: String(amountNum),
+        note: ledgerDraft.note || "",
+        stockSymbol: isStockInvestment ? (ledgerDraft.stockDetails?.stock || "") : "",
+        holdingId: isStockInvestment ? holdingId : null,
+      };
+
       if (editingLedgerId) {
-        const updated = { ...ledgerDraft, id: editingLedgerId };
-        setLedger(prev => prev.map(l => (l.id === editingLedgerId ? updated : l)));
-        if (dbStatus.tablesReady) await persistLedger(updated);
+        setLedger(prev => prev.map(l => (l.id === editingLedgerId ? ledgerObj : l)));
+        if (dbStatus.tablesReady) await persistLedger(ledgerObj);
         setEditingLedgerId(null);
       } else {
-        const created = { ...ledgerDraft, id: ledgerDraft.id || crypto.randomUUID() };
-        setLedger(prev => [...prev, created]);
-        if (dbStatus.tablesReady) await persistLedger(created);
+        setLedger(prev => [...prev, ledgerObj]);
+        if (dbStatus.tablesReady) await persistLedger(ledgerObj);
       }
+
       setLedgerDraft(emptyLedger());
       setShowLedgerForm(false);
       setSaveState("saved");
@@ -528,7 +700,7 @@ export default function Dashboard() {
     if (!withdrawDraft.amount) return;
     setSaveState("saving");
     try {
-      const created = { id: crypto.randomUUID(), type: "Withdrawal", ...withdrawDraft };
+      const created = { id: crypto.randomUUID(), type: "Withdrawal", withdrawalUse: "cash", ...withdrawDraft };
       setLedger(prev => [...prev, created]);
       if (dbStatus.tablesReady) await persistLedger(created);
       setWithdrawDraft({ date: todayLocalISO(), amount: "", note: "" });
@@ -542,11 +714,21 @@ export default function Dashboard() {
   };
 
   const deleteLedger = async (id) => {
-    if (!confirm("Are you sure you want to delete this ledger entry?")) return;
+    const entry = ledger.find(l => l.id === id);
+    if (!confirm("Are you sure you want to delete this capital entry?")) return;
     setSaveState("saving");
     try {
       setLedger(prev => prev.filter(l => l.id !== id));
       if (dbStatus.tablesReady) await removeLedgerFromDb(id);
+
+      if (entry && (entry.holdingId || entry.withdrawalUse === "stock")) {
+        const linkedId = entry.holdingId;
+        if (linkedId) {
+          setHoldings(prev => prev.filter(h => h.id !== linkedId && h.ledgerId !== id));
+          if (dbStatus.tablesReady) await removeHoldingFromDb(linkedId);
+        }
+      }
+
       if (editingLedgerId === id) cancelLedgerForm();
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
@@ -557,19 +739,78 @@ export default function Dashboard() {
   };
 
   // Holdings actions
+  const startEditHolding = (h) => {
+    setHoldingDraft({
+      id: h.id,
+      date: h.date,
+      stock: h.stock || "",
+      companyName: h.companyName || "",
+      exchange: h.exchange || "NSE",
+      qty: h.qty || "",
+      buyPrice: h.buyPrice || "",
+      currentPrice: h.currentPrice || "",
+      priceUpdatedOn: h.priceUpdatedOn || h.date,
+      peRatio: h.peRatio || "",
+      beta: h.beta || "",
+      companySize: h.companySize || "Large cap",
+      valuationView: h.valuationView || "Needs review",
+      dividendDate: h.dividendDate || "",
+      dividendPerShare: h.dividendPerShare || "",
+      investmentNote: h.investmentNote || "",
+      newsDate: h.newsDate || "",
+      deductFromTradingCapital: false,
+    });
+    setEditingHoldingId(h.id);
+    setShowHoldingForm(true);
+  };
+
+  const cancelHoldingForm = () => {
+    setShowHoldingForm(false);
+    setEditingHoldingId(null);
+    setHoldingDraft(emptyHolding());
+  };
+
   const addHolding = async () => {
     setSaveState("saving");
     try {
+      const holdingId = editingHoldingId || holdingDraft.id || crypto.randomUUID();
+      const buyPriceNum = Number(holdingDraft.buyPrice) || 0;
+      const qtyNum = Number(holdingDraft.qty) || 0;
+      const totalCost = buyPriceNum * qtyNum;
+
+      const holdingObj = {
+        ...holdingDraft,
+        id: holdingId,
+        stock: (holdingDraft.stock || holdingDraft.companyName || "STOCK").toUpperCase().trim(),
+        companyName: holdingDraft.companyName || holdingDraft.stock || "",
+        currentPrice: holdingDraft.currentPrice !== "" ? holdingDraft.currentPrice : holdingDraft.buyPrice,
+      };
+
       if (editingHoldingId) {
-        const updated = { ...holdingDraft, id: editingHoldingId };
-        setHoldings(prev => prev.map(h => (h.id === editingHoldingId ? updated : h)));
-        if (dbStatus.tablesReady) await persistHolding(updated);
+        setHoldings(prev => prev.map(h => (h.id === editingHoldingId ? holdingObj : h)));
+        if (dbStatus.tablesReady) await persistHolding(holdingObj);
         setEditingHoldingId(null);
       } else {
-        const created = { ...holdingDraft, id: holdingDraft.id || crypto.randomUUID() };
-        setHoldings(prev => [...prev, created]);
-        if (dbStatus.tablesReady) await persistHolding(created);
+        setHoldings(prev => [...prev, holdingObj]);
+        if (dbStatus.tablesReady) await persistHolding(holdingObj);
+
+        // If deductFromTradingCapital is checked, record matching capital movement
+        if (holdingDraft.deductFromTradingCapital && totalCost > 0) {
+          const ledgerEntry = {
+            id: crypto.randomUUID(),
+            date: holdingDraft.date,
+            type: "Withdrawal",
+            withdrawalUse: "stock",
+            amount: String(totalCost),
+            note: `Stock purchase: ${holdingObj.stock} (${holdingDraft.companyName || holdingObj.stock})`,
+            stockSymbol: holdingObj.stock,
+            holdingId: holdingId,
+          };
+          setLedger(prev => [...prev, ledgerEntry]);
+          if (dbStatus.tablesReady) await persistLedger(ledgerEntry);
+        }
       }
+
       setHoldingDraft(emptyHolding());
       setShowHoldingForm(false);
       setSaveState("saved");
@@ -1041,39 +1282,310 @@ export default function Dashboard() {
         </ModalWrapper>
       )}
 
-      {/* Modal: Capital Ledger Form */}
+      {/* Modal: Record Capital Movement */}
       {showLedgerForm && (
-        <ModalWrapper onClose={() => setShowLedgerForm(false)} title={editingLedgerId ? "Edit Ledger Entry" : "New Capital Entry"}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-            <div>
-              <label>Date</label>
-              <input type="date" value={ledgerDraft.date} onChange={e => setLedgerDraft({ ...ledgerDraft, date: e.target.value })} />
+        <ModalWrapper
+          onClose={cancelLedgerForm}
+          title={editingLedgerId ? "Edit Capital Movement" : "Record capital movement"}
+          subtitle="Keep deposits and withdrawals separate from trading profits"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Date & Movement Selection */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={ledgerDraft.date}
+                  onChange={e => setLedgerDraft(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label>Movement</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, height: 44 }}>
+                  <button
+                    type="button"
+                    onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Deposit" }))}
+                    style={{
+                      borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
+                      background: ledgerDraft.type === "Deposit" ? "var(--color-win-soft)" : "var(--bg-elevated)",
+                      border: ledgerDraft.type === "Deposit" ? "2px solid var(--color-win)" : "1px solid var(--border-subtle)",
+                      color: ledgerDraft.type === "Deposit" ? "var(--color-win-text)" : "var(--text-secondary)",
+                    }}
+                  >
+                    Deposit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Withdrawal" }))}
+                    style={{
+                      borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
+                      background: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-soft)" : "var(--bg-elevated)",
+                      border: ledgerDraft.type === "Withdrawal" ? "2px solid var(--color-loss)" : "1px solid var(--border-subtle)",
+                      color: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-text)" : "var(--text-secondary)",
+                    }}
+                  >
+                    Withdrawal
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* When Withdrawal is selected: "Withdrawal used for" */}
+            {ledgerDraft.type === "Withdrawal" && (
+              <div style={{
+                background: "var(--bg-elevated)", padding: 14, borderRadius: 10,
+                border: "1px solid var(--border-subtle)"
+              }}>
+                <label>Withdrawal used for</label>
+                <select
+                  value={ledgerDraft.withdrawalUse || "cash"}
+                  onChange={e => setLedgerDraft(prev => ({ ...prev, withdrawalUse: e.target.value }))}
+                  style={{ fontWeight: 600, fontSize: 14 }}
+                >
+                  <option value="cash">Cash withdrawal</option>
+                  <option value="stock">Stock investment</option>
+                </select>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.4 }}>
+                  Each movement is reported separately in equity wealth / compound cash net profit from trading profit.
+                </div>
+              </div>
+            )}
+
+            {/* Amount Input */}
             <div>
-              <label>Transaction Type</label>
-              <select value={ledgerDraft.type} onChange={e => setLedgerDraft({ ...ledgerDraft, type: e.target.value })}>
-                <option>Deposit</option>
-                <option>Withdrawal</option>
-              </select>
+              <label>
+                {ledgerDraft.type === "Deposit"
+                  ? "Amount deposited (₹)"
+                  : ledgerDraft.withdrawalUse === "stock"
+                    ? "Amount withdrawn / deposited (₹)"
+                    : "Amount withdrawn (₹)"}
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 500000"
+                className="mono"
+                value={ledgerDraft.amount}
+                onChange={e => setLedgerDraft(prev => ({ ...prev, amount: e.target.value }))}
+                style={{ fontSize: 18, fontWeight: 700 }}
+              />
             </div>
+
+            {/* When Stock Investment is selected: Comprehensive Stock Details Card */}
+            {ledgerDraft.type === "Withdrawal" && ledgerDraft.withdrawalUse === "stock" && (
+              <div style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--color-gold-border)",
+                borderRadius: 12,
+                padding: 16,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Stock Investment Details
+                  </div>
+                  <span style={{
+                    fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                    background: "var(--color-gold-soft)", color: "var(--color-gold)", fontWeight: 700
+                  }}>AUTO-SYNCED TO HOLDINGS</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 14 }}>
+                  Record and review the investment — input company name and research notes whenever you review this holding
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                  <div>
+                    <label>Company name</label>
+                    <input
+                      placeholder="e.g. Reliance Industries"
+                      value={ledgerDraft.stockDetails?.companyName || ""}
+                      onChange={e => updateLedgerStockDetail("companyName", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Stock symbol</label>
+                    <input
+                      placeholder="e.g. RELIANCE"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.stock || ""}
+                      onChange={e => updateLedgerStockDetail("stock", e.target.value.toUpperCase())}
+                    />
+                  </div>
+                  <div>
+                    <label>Exchange</label>
+                    <select
+                      value={ledgerDraft.stockDetails?.exchange || "NSE"}
+                      onChange={e => updateLedgerStockDetail("exchange", e.target.value)}
+                    >
+                      <option>NSE</option>
+                      <option>BSE</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Quantity</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 100"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.qty || ""}
+                      onChange={e => updateLedgerStockDetail("qty", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Purchase price / share (₹)</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      placeholder="e.g. 2450.50"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.buyPrice || ""}
+                      onChange={e => updateLedgerStockDetail("buyPrice", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Current price / share (₹)</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      placeholder="defaults to purchase price"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.currentPrice || ""}
+                      onChange={e => updateLedgerStockDetail("currentPrice", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Price updated on</label>
+                    <input
+                      type="date"
+                      value={ledgerDraft.stockDetails?.priceUpdatedOn || ""}
+                      onChange={e => updateLedgerStockDetail("priceUpdatedOn", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>P/E ratio</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="e.g. 22.5"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.peRatio || ""}
+                      onChange={e => updateLedgerStockDetail("peRatio", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Beta</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 1.25"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.beta || ""}
+                      onChange={e => updateLedgerStockDetail("beta", e.target.value)}
+                    />
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                      1.20 or above is shown as high beta
+                    </div>
+                  </div>
+                  <div>
+                    <label>Company size</label>
+                    <select
+                      value={ledgerDraft.stockDetails?.companySize || "Large cap"}
+                      onChange={e => updateLedgerStockDetail("companySize", e.target.value)}
+                    >
+                      <option>Large cap</option>
+                      <option>Mid cap</option>
+                      <option>Small cap</option>
+                      <option>Micro cap</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Valuation view</label>
+                    <select
+                      value={ledgerDraft.stockDetails?.valuationView || "Needs review"}
+                      onChange={e => updateLedgerStockDetail("valuationView", e.target.value)}
+                    >
+                      <option>Needs review</option>
+                      <option>Undervalued</option>
+                      <option>Fair</option>
+                      <option>Overvalued</option>
+                    </select>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                      Nudge P/E against the company's sector and history
+                    </div>
+                  </div>
+                  <div>
+                    <label>Next dividend / ex-date (optional)</label>
+                    <input
+                      type="date"
+                      value={ledgerDraft.stockDetails?.dividendDate || ""}
+                      onChange={e => updateLedgerStockDetail("dividendDate", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>Dividend per share (₹) (optional)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="e.g. 10"
+                      className="mono"
+                      value={ledgerDraft.stockDetails?.dividendPerShare || ""}
+                      onChange={e => updateLedgerStockDetail("dividendPerShare", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label>News date (optional)</label>
+                    <input
+                      type="date"
+                      value={ledgerDraft.stockDetails?.newsDate || ""}
+                      onChange={e => updateLedgerStockDetail("newsDate", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <label>Latest news / investment note (optional)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Earnings, order win, management change, thesis..."
+                    value={ledgerDraft.stockDetails?.investmentNote || ""}
+                    onChange={e => updateLedgerStockDetail("investmentNote", e.target.value)}
+                    style={{ resize: "vertical" }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Optional Notes */}
             <div>
-              <label>Amount (₹)</label>
-              <input type="number" placeholder="0" value={ledgerDraft.amount} onChange={e => setLedgerDraft({ ...ledgerDraft, amount: e.target.value })} />
-            </div>
-            <div>
-              <label>Note</label>
-              <input placeholder="optional notes" value={ledgerDraft.note} onChange={e => setLedgerDraft({ ...ledgerDraft, note: e.target.value })} />
+              <label>Notes (optional)</label>
+              <input
+                placeholder={ledgerDraft.type === "Deposit" ? "e.g. Opening capital, fresh deposit" : "e.g. Payout, thesis"}
+                value={ledgerDraft.note}
+                onChange={e => setLedgerDraft(prev => ({ ...prev, note: e.target.value }))}
+              />
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button onClick={() => setShowLedgerForm(false)} style={{
-              background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
-              borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}>Cancel</button>
-            <button onClick={addLedger} style={{
-              background: "var(--color-win)", border: "none", color: "#FFFFFF",
-              borderRadius: 8, padding: "10px 22px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}>
+
+          {/* Action Buttons */}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+            <button
+              onClick={cancelLedgerForm}
+              style={{
+                background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
+                borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={addLedger}
+              style={{
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                border: "none", color: "#0F172A",
+                borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
+              }}
+            >
               {editingLedgerId ? "Update Entry" : "Save Entry"}
             </button>
           </div>
@@ -1082,44 +1594,222 @@ export default function Dashboard() {
 
       {/* Modal: Holding Form */}
       {showHoldingForm && (
-        <ModalWrapper onClose={() => setShowHoldingForm(false)} title={editingHoldingId ? "Edit Holding" : "New Equity Investment"}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-            <div>
-              <label>Buy Date</label>
-              <input type="date" value={holdingDraft.date} onChange={e => setHoldingDraft({ ...holdingDraft, date: e.target.value })} />
-            </div>
-            <div>
-              <label>Stock / Symbol</label>
-              <input placeholder="e.g. BSE, HDFC Bank" value={holdingDraft.stock} onChange={e => setHoldingDraft({ ...holdingDraft, stock: e.target.value })} />
-            </div>
-            <div>
-              <label>Quantity</label>
-              <input type="number" placeholder="0" value={holdingDraft.qty} onChange={e => setHoldingDraft({ ...holdingDraft, qty: e.target.value })} />
-            </div>
-            <div>
-              <label>Buy Price (₹)</label>
-              <input type="number" placeholder="0" value={holdingDraft.buyPrice} onChange={e => setHoldingDraft({ ...holdingDraft, buyPrice: e.target.value })} />
-            </div>
-            <div>
-              <label>Current Price (₹, optional)</label>
-              <input type="number" placeholder="defaults to buy price" value={holdingDraft.currentPrice} onChange={e => setHoldingDraft({ ...holdingDraft, currentPrice: e.target.value })} />
-            </div>
-            <div>
-              <label>Total Invested</label>
-              <div className="mono" style={{ padding: "10px 14px", borderRadius: 8, background: "var(--bg-elevated)", fontWeight: 700 }}>
-                {fmtINR((Number(holdingDraft.qty) || 0) * (Number(holdingDraft.buyPrice) || 0))}
+        <ModalWrapper
+          onClose={cancelHoldingForm}
+          title={editingHoldingId ? "Edit Stock Holding" : "New Equity Investment"}
+          subtitle="Record and review the investment — input company details and research metrics"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+              <div>
+                <label>Company Name</label>
+                <input
+                  placeholder="e.g. Reliance Industries"
+                  value={holdingDraft.companyName}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, companyName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Stock Symbol</label>
+                <input
+                  placeholder="e.g. RELIANCE"
+                  className="mono"
+                  value={holdingDraft.stock}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, stock: e.target.value.toUpperCase() }))}
+                />
+              </div>
+              <div>
+                <label>Exchange</label>
+                <select
+                  value={holdingDraft.exchange}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, exchange: e.target.value }))}
+                >
+                  <option>NSE</option>
+                  <option>BSE</option>
+                </select>
+              </div>
+              <div>
+                <label>Purchase Date</label>
+                <input
+                  type="date"
+                  value={holdingDraft.date}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Quantity</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 100"
+                  className="mono"
+                  value={holdingDraft.qty}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, qty: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Buy Price / Share (₹)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  placeholder="e.g. 2450.50"
+                  className="mono"
+                  value={holdingDraft.buyPrice}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, buyPrice: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Current Price / Share (₹)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  placeholder="defaults to buy price"
+                  className="mono"
+                  value={holdingDraft.currentPrice}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, currentPrice: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Price Updated On</label>
+                <input
+                  type="date"
+                  value={holdingDraft.priceUpdatedOn}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, priceUpdatedOn: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>P/E Ratio</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="e.g. 22.5"
+                  className="mono"
+                  value={holdingDraft.peRatio}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, peRatio: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Beta</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 1.25"
+                  className="mono"
+                  value={holdingDraft.beta}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, beta: e.target.value }))}
+                />
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                  1.20 or above is shown as high beta
+                </div>
+              </div>
+              <div>
+                <label>Company Size</label>
+                <select
+                  value={holdingDraft.companySize}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, companySize: e.target.value }))}
+                >
+                  <option>Large cap</option>
+                  <option>Mid cap</option>
+                  <option>Small cap</option>
+                  <option>Micro cap</option>
+                </select>
+              </div>
+              <div>
+                <label>Valuation View</label>
+                <select
+                  value={holdingDraft.valuationView}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, valuationView: e.target.value }))}
+                >
+                  <option>Needs review</option>
+                  <option>Undervalued</option>
+                  <option>Fair</option>
+                  <option>Overvalued</option>
+                </select>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                  Nudge P/E against the company's sector and history
+                </div>
+              </div>
+              <div>
+                <label>Next Dividend / Ex-Date (Optional)</label>
+                <input
+                  type="date"
+                  value={holdingDraft.dividendDate}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, dividendDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Dividend Per Share (₹) (Optional)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  placeholder="e.g. 10"
+                  className="mono"
+                  value={holdingDraft.dividendPerShare}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, dividendPerShare: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>News Date (Optional)</label>
+                <input
+                  type="date"
+                  value={holdingDraft.newsDate}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, newsDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Total Invested</label>
+                <div className="mono" style={{ padding: "10px 14px", borderRadius: 8, background: "var(--bg-elevated)", fontWeight: 700, fontSize: 16, color: "var(--color-gold)" }}>
+                  {fmtINR((Number(holdingDraft.qty) || 0) * (Number(holdingDraft.buyPrice) || 0))}
+                </div>
               </div>
             </div>
+
+            <div>
+              <label>Latest News / Investment Note (Optional)</label>
+              <textarea
+                rows={2}
+                placeholder="Earnings, order win, management change, thesis..."
+                value={holdingDraft.investmentNote}
+                onChange={e => setHoldingDraft(prev => ({ ...prev, investmentNote: e.target.value }))}
+                style={{ resize: "vertical" }}
+              />
+            </div>
+
+            {!editingHoldingId && (
+              <label style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+                background: "var(--bg-elevated)", borderRadius: 8, cursor: "pointer",
+                border: "1px solid var(--border-subtle)", textTransform: "none", fontSize: 13, color: "var(--text-main)", margin: 0
+              }}>
+                <input
+                  type="checkbox"
+                  style={{ width: 16, height: 16, accentColor: "var(--color-gold)", minHeight: "auto" }}
+                  checked={holdingDraft.deductFromTradingCapital}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, deductFromTradingCapital: e.target.checked }))}
+                />
+                Deduct from trading capital (record movement in Capital Ledger)
+              </label>
+            )}
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button onClick={() => setShowHoldingForm(false)} style={{
-              background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
-              borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}>Cancel</button>
-            <button onClick={addHolding} style={{
-              background: "var(--color-win)", border: "none", color: "#FFFFFF",
-              borderRadius: 8, padding: "10px 22px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+            <button
+              onClick={cancelHoldingForm}
+              style={{
+                background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
+                borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={addHolding}
+              style={{
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                border: "none", color: "#0F172A",
+                borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
+              }}
+            >
               {editingHoldingId ? "Update Holding" : "Save Holding"}
             </button>
           </div>
@@ -1151,22 +1841,25 @@ function MetricSummaryCard({ label, value, icon, isPnl, val, customColor }) {
 }
 
 // Modal Wrapper Component
-function ModalWrapper({ children, onClose, title }) {
+function ModalWrapper({ children, onClose, title, subtitle }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0, 0, 0, 0.7)",
+      background: "rgba(0, 0, 0, 0.75)",
       backdropFilter: "blur(6px)",
       WebkitBackdropFilter: "blur(6px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16
     }}>
       <div className="glass-card mobile-modal" style={{
-        maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto",
+        maxWidth: 780, width: "100%", maxHeight: "90vh", overflowY: "auto",
         padding: 24, boxShadow: "0 20px 40px rgba(0, 0, 0, 0.5)"
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text-main)" }}>{title}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}><X size={20} /></button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-main)" }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{subtitle}</div>}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -1551,19 +2244,27 @@ function CapitalTab({ startingCapital, setStartingCapital, ledger, stats, openNe
           />
         </div>
         <MetricSummaryCard label="Total Deposits" value={fmtINR(stats.deposits)} icon={<Wallet size={16} />} customColor="var(--color-win-text)" />
-        <MetricSummaryCard label="Total Withdrawals" value={fmtINR(stats.withdrawals)} icon={<ArrowDownToLine size={16} />} customColor="var(--color-loss-text)" />
-        <MetricSummaryCard label="Equity Invested (auto)" value={fmtINR(stats.totalInvestedOut)} icon={<PiggyBank size={16} />} customColor="var(--color-gold)" />
+        <MetricSummaryCard label="Cash Withdrawn" value={fmtINR(stats.cashWithdrawn)} icon={<ArrowDownToLine size={16} />} customColor="var(--color-loss-text)" />
+        <MetricSummaryCard label="Moved into Stocks" value={fmtINR(stats.movedIntoStocks)} icon={<PiggyBank size={16} />} customColor="var(--color-gold)" />
+        <MetricSummaryCard label="Net Capital Added" value={fmtINR(stats.netCapitalAdded)} icon={<Target size={16} />} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
-          Capital Ledger History ({ledger.length})
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
+            Capital Ledger History ({ledger.length})
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+            Deposits, cash withdrawals, and capital allocated into equity investments
+          </div>
         </div>
         <button
           onClick={openNewLedgerForm}
           style={{
-            display: "flex", alignItems: "center", gap: 6, background: "var(--color-gold)",
-            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer"
+            display: "flex", alignItems: "center", gap: 6,
+            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
           }}
         >
           <Plus size={15} strokeWidth={2.5} />
@@ -1573,30 +2274,49 @@ function CapitalTab({ startingCapital, setStartingCapital, ledger, stats, openNe
 
       {/* Mobile View: Ledger Cards */}
       <div className="mobile-only" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {[...ledger].reverse().map(l => (
-          <div key={l.id} className="glass-card" style={{ padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmtDate(l.date)}</span>
-                <span style={{
-                  padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                  background: l.type === "Deposit" ? "var(--color-win-soft)" : "var(--color-loss-soft)",
-                  color: l.type === "Deposit" ? "var(--color-win-text)" : "var(--color-loss-text)"
-                }}>{l.type}</span>
+        {[...ledger].reverse().map(l => {
+          const isDeposit = l.type === "Deposit";
+          const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
+          const movementLabel = isDeposit ? "Deposit" : isStock ? "Stock investment" : "Cash withdrawal";
+          const useLabel = isDeposit ? "Trading capital" : isStock ? (l.stockSymbol ? `Stock: ${l.stockSymbol}` : "Stock investment") : "Personal cash";
+          const amountSign = isDeposit ? "+" : "-";
+          const amountColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+          const badgeBg = isDeposit ? "var(--color-win-soft)" : isStock ? "var(--color-gold-soft)" : "var(--color-loss-soft)";
+          const badgeColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+
+          return (
+            <div key={l.id} className="glass-card" style={{ padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmtDate(l.date)}</span>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: badgeBg, color: badgeColor
+                  }}>{movementLabel}</span>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }}><Pencil size={14} /></button>
+                  <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }}><Trash2 size={14} /></button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }}><Pencil size={14} /></button>
-                <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }}><Trash2 size={14} /></button>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: amountColor }}>
+                  {amountSign}{fmtINR(l.amount)}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+                  {useLabel}
+                </div>
               </div>
+
+              {l.note && (
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", fontStyle: "italic", marginTop: 4, borderTop: "1px solid var(--border-subtle)", paddingTop: 6 }}>
+                  {l.note}
+                </div>
+              )}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: l.type === "Deposit" ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
-                {l.type === "Deposit" ? "+" : "-"}{fmtINR(l.amount)}
-              </div>
-              {l.note && <div style={{ fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.note}</div>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Desktop View: Ledger Table */}
@@ -1604,32 +2324,45 @@ function CapitalTab({ startingCapital, setStartingCapital, ledger, stats, openNe
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
-              {["Date", "Type", "Amount", "Note", ""].map(h => (
+              {["Date", "Movement", "Use", "Notes", "Net Amount", ""].map(h => (
                 <th key={h} style={{ padding: "12px 14px", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {[...ledger].reverse().map(l => (
-              <tr key={l.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                <td className="mono" style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{fmtDate(l.date)}</td>
-                <td style={{ padding: "11px 14px" }}>
-                  <span style={{
-                    padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                    background: l.type === "Deposit" ? "var(--color-win-soft)" : "var(--color-loss-soft)",
-                    color: l.type === "Deposit" ? "var(--color-win-text)" : "var(--color-loss-text)"
-                  }}>{l.type}</span>
-                </td>
-                <td className="mono" style={{ padding: "11px 14px", fontWeight: 600 }}>{fmtINR(l.amount)}</td>
-                <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{l.note || "—"}</td>
-                <td style={{ padding: "11px 14px" }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}><Pencil size={14} /></button>
-                    <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }}><Trash2 size={14} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {[...ledger].reverse().map(l => {
+              const isDeposit = l.type === "Deposit";
+              const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
+              const movementLabel = isDeposit ? "Deposit" : isStock ? "Stock investment" : "Cash withdrawal";
+              const useLabel = isDeposit ? "Trading capital" : isStock ? (l.stockSymbol ? `Stock: ${l.stockSymbol}` : "Stock investment") : "Personal cash";
+              const amountSign = isDeposit ? "+" : "-";
+              const amountColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+              const badgeBg = isDeposit ? "var(--color-win-soft)" : isStock ? "var(--color-gold-soft)" : "var(--color-loss-soft)";
+              const badgeColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+
+              return (
+                <tr key={l.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <td className="mono" style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{fmtDate(l.date)}</td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <span style={{
+                      padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: badgeBg, color: badgeColor
+                    }}>{movementLabel}</span>
+                  </td>
+                  <td style={{ padding: "11px 14px", fontWeight: 600, color: "var(--text-main)" }}>{useLabel}</td>
+                  <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{l.note || "—"}</td>
+                  <td className="mono" style={{ padding: "11px 14px", fontWeight: 700, color: amountColor }}>
+                    {amountSign}{fmtINR(l.amount)}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }} title="Edit"><Pencil size={14} /></button>
+                      <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }} title="Delete"><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1649,14 +2382,21 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
-          Equity Portfolio Holdings ({holdings.length})
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
+            Equity Portfolio Holdings ({holdings.length})
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+            Long-term wealth generated by compounding trading profits into high-conviction stocks
+          </div>
         </div>
         <button
           onClick={openNewHoldingForm}
           style={{
-            display: "flex", alignItems: "center", gap: 6, background: "var(--color-gold)",
-            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer"
+            display: "flex", alignItems: "center", gap: 6,
+            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
           }}
         >
           <Plus size={15} strokeWidth={2.5} />
@@ -1674,12 +2414,30 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
           const curVal = qty * cp;
           const pnl = curVal - invested;
           const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+
           return (
             <div key={h.id} className="glass-card" style={{ padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                 <div>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</span>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>{fmtDate(h.date)}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</span>
+                    <span style={{
+                      fontSize: 10, padding: "2px 6px", borderRadius: 4,
+                      background: "var(--bg-elevated)", color: "var(--color-gold)", fontWeight: 700
+                    }}>{h.exchange || "NSE"}</span>
+                    {h.companySize && (
+                      <span style={{
+                        fontSize: 10, padding: "2px 6px", borderRadius: 4,
+                        background: "var(--bg-elevated)", color: "var(--text-muted)"
+                      }}>{h.companySize}</span>
+                    )}
+                  </div>
+                  {h.companyName && h.companyName !== h.stock && (
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{h.companyName}</div>
+                  )}
+                  <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    Purchased {fmtDate(h.date)}
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }}><Pencil size={14} /></button>
@@ -1703,18 +2461,34 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                   <span style={{ fontSize: 11, color: "var(--text-muted)" }}>CMP:</span>
                   <input
                     type="number"
+                    step="0.05"
                     value={h.currentPrice}
                     placeholder={String(buy)}
                     onChange={e => updateHoldingPrice(h.id, e.target.value)}
-                    style={{ width: 80, padding: "3px 6px", fontSize: 12, minHeight: 28 }}
+                    style={{ width: 85, padding: "3px 6px", fontSize: 12, minHeight: 28 }}
                   />
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                  <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                     {fmtSigned(pnl)} ({fmtPct(pnlPct)})
                   </div>
                 </div>
               </div>
+
+              {(h.peRatio || h.beta || h.valuationView || h.investmentNote) && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)", fontSize: 11, color: "var(--text-secondary)" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: h.investmentNote ? 4 : 0 }}>
+                    {h.peRatio && <span>P/E: <b>{h.peRatio}</b></span>}
+                    {h.beta && <span>Beta: <b>{h.beta}</b></span>}
+                    {h.valuationView && <span>View: <b style={{ color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)" }}>{h.valuationView}</b></span>}
+                  </div>
+                  {h.investmentNote && (
+                    <div style={{ fontStyle: "italic", color: "var(--text-muted)", marginTop: 2 }}>
+                      "{h.investmentNote}"
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -1725,7 +2499,7 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
-              {["Date", "Stock", "Qty", "Buy Price", "Invested", "Current Price", "Current Value", "P&L", "Return %", ""].map(h => (
+              {["Date", "Stock & Company", "Exchange / Cap", "Qty", "Buy Price", "Invested", "Current Price", "Current Value", "P&L", "Return %", "Research / Notes", ""].map(h => (
                 <th key={h} style={{ padding: "12px 14px", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
               ))}
             </tr>
@@ -1739,16 +2513,37 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
               const curVal = qty * cp;
               const pnl = curVal - invested;
               const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+
               return (
                 <tr key={h.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
                   <td className="mono" style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{fmtDate(h.date)}</td>
-                  <td style={{ padding: "11px 14px", fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ fontWeight: 700, color: "var(--text-main)" }}>{h.stock}</div>
+                    {h.companyName && h.companyName !== h.stock && (
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{h.companyName}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <span style={{
+                        padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700,
+                        background: "var(--bg-elevated)", color: "var(--color-gold)"
+                      }}>{h.exchange || "NSE"}</span>
+                      {h.companySize && (
+                        <span style={{
+                          padding: "2px 6px", borderRadius: 4, fontSize: 10,
+                          background: "var(--bg-elevated)", color: "var(--text-secondary)"
+                        }}>{h.companySize}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="mono" style={{ padding: "11px 14px" }}>{qty}</td>
                   <td className="mono" style={{ padding: "11px 14px" }}>{fmtINR(buy)}</td>
                   <td className="mono" style={{ padding: "11px 14px" }}>{fmtINR(invested)}</td>
                   <td style={{ padding: "11px 14px" }}>
                     <input
                       type="number"
+                      step="0.05"
                       value={h.currentPrice}
                       placeholder={String(buy)}
                       onChange={e => updateHoldingPrice(h.id, e.target.value)}
@@ -1758,10 +2553,16 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                   <td className="mono" style={{ padding: "11px 14px", fontWeight: 600 }}>{fmtINR(curVal)}</td>
                   <td className="mono" style={{ padding: "11px 14px", fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>{fmtSigned(pnl)}</td>
                   <td className="mono" style={{ padding: "11px 14px", color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>{fmtPct(pnlPct)}</td>
+                  <td style={{ padding: "11px 14px", maxWidth: 180 }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {h.valuationView && <span style={{ color: "var(--color-gold)", marginRight: 4 }}>[{h.valuationView}]</span>}
+                      {h.investmentNote || "—"}
+                    </div>
+                  </td>
                   <td style={{ padding: "11px 14px" }}>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}><Pencil size={14} /></button>
-                      <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }}><Trash2 size={14} /></button>
+                      <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }} title="Edit"><Pencil size={14} /></button>
+                      <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }} title="Delete"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
