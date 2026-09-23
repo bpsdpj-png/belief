@@ -626,13 +626,14 @@ export default function Dashboard() {
 
       if (isStockInvestment && ledgerDraft.stockDetails?.qty && ledgerDraft.stockDetails?.buyPrice) {
         const computed = (Number(ledgerDraft.stockDetails.qty) || 0) * (Number(ledgerDraft.stockDetails.buyPrice) || 0);
-        if (!amountNum && computed > 0) {
+        if (computed > 0) {
           amountNum = computed;
         }
       }
 
       const ledgerId = editingLedgerId || ledgerDraft.id || generateId();
       let holdingId = ledgerDraft.holdingId || null;
+      let nextHoldings = [...holdings];
 
       // If stock investment, sync to holdings
       if (isStockInvestment && (ledgerDraft.stockDetails?.stock || ledgerDraft.stockDetails?.companyName)) {
@@ -649,7 +650,7 @@ export default function Dashboard() {
           exchange: ledgerDraft.stockDetails.exchange || "NSE",
           qty: ledgerDraft.stockDetails.qty || "",
           buyPrice: ledgerDraft.stockDetails.buyPrice || "",
-          currentPrice: ledgerDraft.stockDetails.currentPrice !== "" ? ledgerDraft.stockDetails.currentPrice : ledgerDraft.stockDetails.buyPrice,
+          currentPrice: ledgerDraft.stockDetails.currentPrice !== "" && ledgerDraft.stockDetails.currentPrice != null ? ledgerDraft.stockDetails.currentPrice : ledgerDraft.stockDetails.buyPrice,
           priceUpdatedOn: ledgerDraft.stockDetails.priceUpdatedOn || ledgerDraft.date,
           peRatio: ledgerDraft.stockDetails.peRatio || "",
           beta: ledgerDraft.stockDetails.beta || "",
@@ -662,15 +663,13 @@ export default function Dashboard() {
           ledgerId: ledgerId,
         };
 
-        setHoldings(prev => {
-          const idx = prev.findIndex(h => h.id === resolvedHoldingId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = holdingObj;
-            return next;
-          }
-          return [...prev, holdingObj];
-        });
+        const idx = nextHoldings.findIndex(h => h.id === resolvedHoldingId);
+        if (idx >= 0) {
+          nextHoldings[idx] = holdingObj;
+        } else {
+          nextHoldings.push(holdingObj);
+        }
+        setHoldings(nextHoldings);
 
         if (dbStatus.tablesReady) {
           await persistHolding(holdingObj);
@@ -683,19 +682,24 @@ export default function Dashboard() {
         type: ledgerDraft.type,
         withdrawalUse: ledgerDraft.type === "Withdrawal" ? (ledgerDraft.withdrawalUse || "cash") : "cash",
         amount: String(amountNum),
-        note: ledgerDraft.note || "",
+        note: ledgerDraft.note || (isStockInvestment ? `Stock purchase: ${ledgerDraft.stockDetails?.stock || ""}` : ""),
         stockSymbol: isStockInvestment ? (ledgerDraft.stockDetails?.stock || "") : "",
         holdingId: isStockInvestment ? holdingId : null,
       };
 
+      let nextLedger;
       if (editingLedgerId) {
-        setLedger(prev => prev.map(l => (l.id === editingLedgerId ? ledgerObj : l)));
+        nextLedger = ledger.map(l => (l.id === editingLedgerId ? ledgerObj : l));
+        setLedger(nextLedger);
         if (dbStatus.tablesReady) await persistLedger(ledgerObj);
         setEditingLedgerId(null);
       } else {
-        setLedger(prev => [...prev, ledgerObj]);
+        nextLedger = [...ledger, ledgerObj];
+        setLedger(nextLedger);
         if (dbStatus.tablesReady) await persistLedger(ledgerObj);
       }
+
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
 
       setLedgerDraft(emptyLedger());
       setShowLedgerForm(false);
@@ -712,7 +716,9 @@ export default function Dashboard() {
     setSaveState("saving");
     try {
       const created = { id: generateId(), type: "Withdrawal", withdrawalUse: "cash", ...withdrawDraft };
-      setLedger(prev => [...prev, created]);
+      const nextLedger = [...ledger, created];
+      setLedger(nextLedger);
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings, targetPct });
       if (dbStatus.tablesReady) await persistLedger(created);
       setWithdrawDraft({ date: todayLocalISO(), amount: "", note: "" });
       setShowWithdrawForm(false);
@@ -729,16 +735,23 @@ export default function Dashboard() {
     if (!confirm("Are you sure you want to delete this capital entry?")) return;
     setSaveState("saving");
     try {
-      setLedger(prev => prev.filter(l => l.id !== id));
+      const nextLedger = ledger.filter(l => l.id !== id);
+      setLedger(nextLedger);
       if (dbStatus.tablesReady) await removeLedgerFromDb(id);
 
-      if (entry && (entry.holdingId || entry.withdrawalUse === "stock")) {
+      let nextHoldings = holdings;
+      if (entry && (entry.holdingId || entry.withdrawalUse === "stock" || entry.stockSymbol)) {
         const linkedId = entry.holdingId;
-        if (linkedId) {
-          setHoldings(prev => prev.filter(h => h.id !== linkedId && h.ledgerId !== id));
-          if (dbStatus.tablesReady) await removeHoldingFromDb(linkedId);
+        const sym = (entry.stockSymbol || "").toUpperCase().trim();
+        const removed = holdings.find(h => (linkedId && h.id === linkedId) || h.ledgerId === id || (sym && h.stock === sym));
+        if (removed) {
+          nextHoldings = holdings.filter(h => h.id !== removed.id);
+          setHoldings(nextHoldings);
+          if (dbStatus.tablesReady) await removeHoldingFromDb(removed.id);
         }
       }
+
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
 
       if (editingLedgerId === id) cancelLedgerForm();
       setSaveState("saved");
@@ -753,23 +766,25 @@ export default function Dashboard() {
   const startEditHolding = (h) => {
     setHoldingDraft({
       id: h.id,
-      date: h.date,
+      date: h.date || todayLocalISO(),
       stock: h.stock || "",
       companyName: h.companyName || "",
       exchange: h.exchange || "NSE",
-      qty: h.qty || "",
-      buyPrice: h.buyPrice || "",
-      currentPrice: h.currentPrice || "",
-      priceUpdatedOn: h.priceUpdatedOn || h.date,
-      peRatio: h.peRatio || "",
-      beta: h.beta || "",
+      qty: h.qty != null ? String(h.qty) : "",
+      buyPrice: h.buyPrice != null ? String(h.buyPrice) : "",
+      currentPrice: h.currentPrice != null ? String(h.currentPrice) : "",
+      priceUpdatedOn: h.priceUpdatedOn || h.date || todayLocalISO(),
+      peRatio: h.peRatio != null ? String(h.peRatio) : "",
+      beta: h.beta != null ? String(h.beta) : "",
       companySize: h.companySize || "Large cap",
       valuationView: h.valuationView || "Needs review",
       dividendDate: h.dividendDate || "",
-      dividendPerShare: h.dividendPerShare || "",
+      dividendPerShare: h.dividendPerShare != null ? String(h.dividendPerShare) : "",
       investmentNote: h.investmentNote || "",
       newsDate: h.newsDate || "",
       deductFromTradingCapital: false,
+      ledgerId: h.ledgerId || null,
+      metadata: h.metadata || {},
     });
     setEditingHoldingId(h.id);
     setShowHoldingForm(true);
@@ -788,52 +803,78 @@ export default function Dashboard() {
       const buyPriceNum = Number(holdingDraft.buyPrice) || 0;
       const qtyNum = Number(holdingDraft.qty) || 0;
       const totalCost = buyPriceNum * qtyNum;
+      const stockSymbol = (holdingDraft.stock || holdingDraft.companyName || "STOCK").toUpperCase().trim();
+
+      let linkedLedgerId = holdingDraft.ledgerId;
+      if (!linkedLedgerId) {
+        const found = ledger.find(l => l.holdingId === holdingId || (l.stockSymbol === stockSymbol && l.withdrawalUse === "stock"));
+        if (found) linkedLedgerId = found.id;
+      }
+
+      let newLedgerEntry = null;
+      if (!editingHoldingId && holdingDraft.deductFromTradingCapital && totalCost > 0) {
+        linkedLedgerId = linkedLedgerId || generateId();
+        newLedgerEntry = {
+          id: linkedLedgerId,
+          date: holdingDraft.date,
+          type: "Withdrawal",
+          withdrawalUse: "stock",
+          amount: String(totalCost),
+          note: `Stock purchase: ${stockSymbol} (${holdingDraft.companyName || stockSymbol})`,
+          stockSymbol: stockSymbol,
+          holdingId: holdingId,
+        };
+      }
 
       const holdingObj = {
         ...holdingDraft,
         id: holdingId,
-        stock: (holdingDraft.stock || holdingDraft.companyName || "STOCK").toUpperCase().trim(),
-        companyName: holdingDraft.companyName || holdingDraft.stock || "",
-        currentPrice: holdingDraft.currentPrice !== "" ? holdingDraft.currentPrice : holdingDraft.buyPrice,
+        stock: stockSymbol,
+        companyName: holdingDraft.companyName || stockSymbol,
+        currentPrice: holdingDraft.currentPrice !== "" && holdingDraft.currentPrice != null ? holdingDraft.currentPrice : holdingDraft.buyPrice,
+        priceUpdatedOn: holdingDraft.priceUpdatedOn || todayLocalISO(),
+        ledgerId: linkedLedgerId || null,
+        metadata: holdingDraft.metadata || {},
       };
 
+      let nextHoldings;
+      let nextLedger = ledger;
+
       if (editingHoldingId) {
-        setHoldings(prev => prev.map(h => (h.id === editingHoldingId ? holdingObj : h)));
-        if (dbStatus.tablesReady) await persistHolding(holdingObj);
+        nextHoldings = holdings.map(h => (h.id === editingHoldingId ? holdingObj : h));
+        setHoldings(nextHoldings);
+        const res = await persistHolding(holdingObj);
+        if (res?.error) console.error("Error updating holding in Supabase:", res.error);
 
         // Keep linked ledger entry in sync if it exists
-        const linkedLedger = ledger.find(l => l.holdingId === editingHoldingId || l.id === holdingObj.ledgerId);
+        const linkedLedger = ledger.find(l => l.holdingId === editingHoldingId || (holdingObj.ledgerId && l.id === holdingObj.ledgerId) || (l.stockSymbol === stockSymbol && l.withdrawalUse === "stock"));
         if (linkedLedger) {
           const updatedLedger = {
             ...linkedLedger,
             amount: totalCost > 0 ? String(totalCost) : linkedLedger.amount,
             stockSymbol: holdingObj.stock,
+            holdingId: holdingId,
             note: `Stock purchase: ${holdingObj.stock} (${holdingObj.companyName || holdingObj.stock})`,
           };
-          setLedger(prev => prev.map(l => (l.id === linkedLedger.id ? updatedLedger : l)));
-          if (dbStatus.tablesReady) await persistLedger(updatedLedger);
+          nextLedger = ledger.map(l => (l.id === linkedLedger.id ? updatedLedger : l));
+          setLedger(nextLedger);
+          await persistLedger(updatedLedger);
         }
         setEditingHoldingId(null);
       } else {
-        setHoldings(prev => [...prev, holdingObj]);
-        if (dbStatus.tablesReady) await persistHolding(holdingObj);
+        nextHoldings = [...holdings, holdingObj];
+        setHoldings(nextHoldings);
+        const res = await persistHolding(holdingObj);
+        if (res?.error) console.error("Error creating holding in Supabase:", res.error);
 
-        // If deductFromTradingCapital is checked, record matching capital movement
-        if (holdingDraft.deductFromTradingCapital && totalCost > 0) {
-          const ledgerEntry = {
-            id: generateId(),
-            date: holdingDraft.date,
-            type: "Withdrawal",
-            withdrawalUse: "stock",
-            amount: String(totalCost),
-            note: `Stock purchase: ${holdingObj.stock} (${holdingDraft.companyName || holdingObj.stock})`,
-            stockSymbol: holdingObj.stock,
-            holdingId: holdingId,
-          };
-          setLedger(prev => [...prev, ledgerEntry]);
-          if (dbStatus.tablesReady) await persistLedger(ledgerEntry);
+        if (newLedgerEntry) {
+          nextLedger = [...ledger, newLedgerEntry];
+          setLedger(nextLedger);
+          await persistLedger(newLedgerEntry);
         }
       }
+
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
 
       setHoldingDraft(emptyHolding());
       setShowHoldingForm(false);
@@ -849,14 +890,21 @@ export default function Dashboard() {
     setSaveState("saving");
     try {
       const target = holdings.find(h => h.id === id);
-      setHoldings(prev => prev.filter(h => h.id !== id));
-      if (dbStatus.tablesReady) {
-        await removeHoldingFromDb(id);
-        const linked = ledger.find(l => l.holdingId === id || (target && l.id === target.ledgerId));
-        if (linked) {
-          setLedger(prev => prev.filter(l => l.id !== linked.id));
-          await removeLedgerFromDb(linked.id);
-        }
+      const nextHoldings = holdings.filter(h => h.id !== id);
+      setHoldings(nextHoldings);
+
+      const linked = ledger.find(l => l.holdingId === id || (target && l.id === target.ledgerId) || (target && l.stockSymbol === target.stock && l.withdrawalUse === "stock"));
+      let nextLedger = ledger;
+      if (linked) {
+        nextLedger = ledger.filter(l => l.id !== linked.id);
+        setLedger(nextLedger);
+      }
+
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
+
+      await removeHoldingFromDb(id);
+      if (linked) {
+        await removeLedgerFromDb(linked.id);
       }
       if (editingHoldingId === id) cancelHoldingForm();
       setSaveState("saved");
@@ -868,36 +916,53 @@ export default function Dashboard() {
   };
 
   const updateHoldingField = async (id, field, val) => {
-    let updatedTarget = null;
-    setHoldings(prev => {
-      return prev.map(h => {
-        if (h.id !== id) return h;
-        const updated = { ...h, [field]: val };
-        if (field === "currentPrice" || field === "buyPrice") {
-          updated.priceUpdatedOn = todayLocalISO();
-        }
-        updatedTarget = updated;
-        return updated;
-      });
-    });
+    const current = holdings.find(h => h.id === id);
+    if (!current) return;
 
-    if (updatedTarget && dbStatus.tablesReady) {
-      try {
-        await persistHolding(updatedTarget);
-        if (field === "qty" || field === "buyPrice") {
-          const qtyN = Number(field === "qty" ? val : updatedTarget.qty) || 0;
-          const buyN = Number(field === "buyPrice" ? val : updatedTarget.buyPrice) || 0;
-          const cost = qtyN * buyN;
-          const linked = ledger.find(l => l.holdingId === id || l.id === updatedTarget.ledgerId);
-          if (linked && cost > 0) {
-            const updatedLedger = { ...linked, amount: String(cost) };
-            setLedger(prev => prev.map(l => (l.id === linked.id ? updatedLedger : l)));
-            await persistLedger(updatedLedger);
-          }
+    const updated = {
+      ...current,
+      [field]: val,
+      ...(field === "currentPrice" || field === "buyPrice" ? { priceUpdatedOn: todayLocalISO() } : {}),
+    };
+
+    // 1. Update React state immediately
+    const nextHoldings = holdings.map(h => (h.id === id ? updated : h));
+    setHoldings(nextHoldings);
+
+    // 2. If qty or buyPrice changed, keep linked ledger entry in sync
+    let nextLedger = ledger;
+    if (field === "qty" || field === "buyPrice") {
+      const qtyN = Number(field === "qty" ? val : updated.qty) || 0;
+      const buyN = Number(field === "buyPrice" ? val : updated.buyPrice) || 0;
+      const cost = qtyN * buyN;
+      const linked = ledger.find(l => l.holdingId === id || (updated.ledgerId && l.id === updated.ledgerId) || (l.stockSymbol === updated.stock && l.withdrawalUse === "stock"));
+      if (linked && cost > 0) {
+        const updatedLedger = { ...linked, amount: String(cost), stockSymbol: updated.stock };
+        nextLedger = ledger.map(l => (l.id === linked.id ? updatedLedger : l));
+        setLedger(nextLedger);
+        if (dbStatus.tablesReady) {
+          persistLedger(updatedLedger).catch(err => console.error("Error syncing ledger amount:", err));
         }
-      } catch (e) {
-        console.warn("Failed to persist holding field update:", e);
       }
+    }
+
+    // 3. Update localStorage cache synchronously
+    saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
+
+    // 4. Persist to Supabase
+    try {
+      setSaveState("saving");
+      const res = await persistHolding(updated);
+      if (res?.error) {
+        console.error("Supabase persistHolding error:", res.error);
+        setSaveState("error");
+      } else {
+        setSaveState("saved");
+        setTimeout(() => setSaveState("idle"), 1500);
+      }
+    } catch (e) {
+      console.error("Failed to persist holding field update:", e);
+      setSaveState("error");
     }
   };
 
@@ -1199,7 +1264,7 @@ export default function Dashboard() {
             ledger={ledger}
             stats={stats}
             openNewLedgerForm={() => { setLedgerDraft(emptyLedger()); setEditingLedgerId(null); setShowLedgerForm(true); }}
-            startEditLedger={(l) => { setLedgerDraft({ ...l }); setEditingLedgerId(l.id); setShowLedgerForm(true); }}
+            startEditLedger={startEditLedger}
             deleteLedger={deleteLedger}
           />
         )}
@@ -1773,7 +1838,44 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <label>Current Price / Share (₹)</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ margin: 0 }}>Current Price / Share (₹)</label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const sym = holdingDraft.stock || holdingDraft.companyName;
+                      if (!sym) return;
+                      try {
+                        const q = await fetchStockQuote(sym);
+                        if (q && q.price != null) {
+                          setHoldingDraft(prev => ({
+                            ...prev,
+                            currentPrice: String(q.price),
+                            priceUpdatedOn: todayLocalISO(),
+                          }));
+                        }
+                      } catch (e) {
+                        console.warn("Quote fetch error:", e);
+                      }
+                    }}
+                    style={{
+                      background: "rgba(229, 184, 105, 0.15)",
+                      border: "1px solid var(--color-gold-border)",
+                      color: "var(--color-gold)",
+                      borderRadius: 4,
+                      padding: "2px 7px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 3,
+                    }}
+                    title="Fetch live market price for this stock"
+                  >
+                    ⚡ Fetch Price
+                  </button>
+                </div>
                 <input
                   type="number"
                   step="0.05"
@@ -1906,27 +2008,58 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-            <button
-              onClick={cancelHoldingForm}
-              style={{
-                background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
-                borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={addHolding}
-              style={{
-                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-                border: "none", color: "#0F172A",
-                borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
-              }}
-            >
-              {editingHoldingId ? "Update Holding" : "Save Holding"}
-            </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22, flexWrap: "wrap", gap: 10 }}>
+            <div>
+              {editingHoldingId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Are you sure you want to delete this stock investment position?")) {
+                      deleteHolding(editingHoldingId);
+                    }
+                  }}
+                  style={{
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    color: "var(--color-loss-text)",
+                    borderRadius: 8,
+                    padding: "9px 14px",
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <Trash2 size={13} /> Delete Position
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
+              <button
+                type="button"
+                onClick={cancelHoldingForm}
+                style={{
+                  background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
+                  borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addHolding}
+                style={{
+                  background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                  border: "none", color: "#0F172A",
+                  borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
+                }}
+              >
+                {editingHoldingId ? "Update Holding" : "Save Holding"}
+              </button>
+            </div>
           </div>
         </ModalWrapper>
       )}
@@ -2500,6 +2633,66 @@ function calcHoldingXIRR(dateStr, invested, curVal) {
   return annualRate;
 }
 
+// Inline input for editable holding metrics (with debounced / blur save and visual feedback)
+function InlineHoldingInput({ initialValue, onSave, prefix, placeholder, min, step, width = 65, title }) {
+  const [val, setVal] = useState(initialValue != null ? String(initialValue) : "");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setVal(initialValue != null ? String(initialValue) : "");
+  }, [initialValue]);
+
+  const commitSave = (newVal) => {
+    const trimmed = String(newVal).trim();
+    if (trimmed !== String(initialValue ?? "").trim()) {
+      onSave(trimmed);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    }
+  };
+
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 3, position: "relative" }}>
+      {prefix && <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>{prefix}</span>}
+      <input
+        type="number"
+        min={min}
+        step={step}
+        placeholder={placeholder}
+        value={val}
+        title={title}
+        onChange={e => setVal(e.target.value)}
+        onBlur={e => commitSave(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+        style={{
+          width,
+          padding: "3px 6px",
+          fontSize: 13,
+          minHeight: 28,
+          fontFamily: "var(--font-mono)",
+          fontWeight: 700,
+          color: "var(--text-main)",
+          background: "var(--bg-elevated)",
+          border: `1px solid ${saved ? "var(--color-win-border)" : "var(--border-subtle)"}`,
+          borderRadius: 6,
+          textAlign: "right",
+          outline: "none",
+          transition: "border-color 0.2s",
+        }}
+      />
+      {saved && (
+        <span style={{ fontSize: 11, color: "var(--color-win-text)", fontWeight: 800, marginLeft: 2 }} title="Saved to cloud!">
+          ✓
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Equity Investments Tab Component
 function InvestmentsTab({
   holdings,
@@ -2830,20 +3023,22 @@ function InvestmentsTab({
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <button
                       onClick={() => startEditHolding(h)}
-                      className="btn-secondary"
                       style={{
-                        padding: "5px 9px",
+                        background: "var(--color-gold-soft)",
+                        border: "1px solid var(--color-gold-border)",
+                        color: "var(--color-gold)",
+                        padding: "6px 12px",
                         fontSize: 12,
-                        fontWeight: 600,
+                        fontWeight: 700,
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 4,
+                        gap: 5,
                         borderRadius: 6,
                         cursor: "pointer",
                       }}
                       title="Edit Full Investment Details"
                     >
-                      <Pencil size={12} /> Edit
+                      <Pencil size={13} /> Edit
                     </button>
                     {deleteConfirmId === h.id ? (
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -2857,7 +3052,7 @@ function InvestmentsTab({
                             color: "#FFFFFF",
                             border: "none",
                             borderRadius: 6,
-                            padding: "5px 8px",
+                            padding: "6px 9px",
                             fontSize: 11,
                             fontWeight: 700,
                             cursor: "pointer",
@@ -2887,7 +3082,7 @@ function InvestmentsTab({
                           background: "rgba(239, 68, 68, 0.1)",
                           border: "1px solid rgba(239, 68, 68, 0.25)",
                           color: "var(--color-loss-text)",
-                          padding: "5px 8px",
+                          padding: "6px 8px",
                           borderRadius: 6,
                           cursor: "pointer",
                           display: "inline-flex",
@@ -2904,48 +3099,27 @@ function InvestmentsTab({
                 {/* Editable Metrics Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 10, marginBottom: 12 }}>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Shares (Qty)</div>
-                    <input
-                      type="number"
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Shares (Qty)</div>
+                    <InlineHoldingInput
+                      initialValue={h.qty}
+                      onSave={val => updateHoldingField(h.id, "qty", val)}
                       min="1"
                       step="1"
-                      value={h.qty}
-                      onChange={e => updateHoldingField(h.id, "qty", e.target.value)}
-                      style={{
-                        marginTop: 4,
-                        padding: "5px 8px",
-                        fontSize: 13,
-                        minHeight: 32,
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        background: "var(--bg-input)",
-                        border: "1px solid var(--border-input)",
-                        borderRadius: 6,
-                      }}
+                      width={85}
                       placeholder="Qty"
-                      title="Edit Quantity directly"
+                      title="Edit Quantity directly (auto-saves)"
                     />
                   </div>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Buy Price (₹)</div>
-                    <input
-                      type="number"
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Buy Price (₹)</div>
+                    <InlineHoldingInput
+                      initialValue={h.buyPrice}
+                      onSave={val => updateHoldingField(h.id, "buyPrice", val)}
+                      prefix="₹"
                       step="0.05"
-                      value={h.buyPrice}
-                      onChange={e => updateHoldingField(h.id, "buyPrice", e.target.value)}
-                      style={{
-                        marginTop: 4,
-                        padding: "5px 8px",
-                        fontSize: 13,
-                        minHeight: 32,
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        background: "var(--bg-input)",
-                        border: "1px solid var(--border-input)",
-                        borderRadius: 6,
-                      }}
+                      width={95}
                       placeholder="Buy Price"
-                      title="Edit Buy Price directly"
+                      title="Edit Buy Price directly (auto-saves)"
                     />
                   </div>
                   <div>
@@ -2971,14 +3145,15 @@ function InvestmentsTab({
                 {/* CMP Quick Updater + Individual Stock XIRR Badge */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(229, 184, 105, 0.05)", borderRadius: 10, border: "1px solid var(--border-subtle)", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 180px" }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>CMP (₹):</span>
-                    <input
-                      type="number"
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>CMP:</span>
+                    <InlineHoldingInput
+                      initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : h.buyPrice}
+                      onSave={val => updateHoldingField(h.id, "currentPrice", val)}
+                      prefix="₹"
                       step="0.05"
-                      value={h.currentPrice ?? ""}
+                      width={85}
                       placeholder={String(buy)}
-                      onChange={e => updateHoldingField(h.id, "currentPrice", e.target.value)}
-                      style={{ width: 85, padding: "5px 8px", fontSize: 13, minHeight: 32, fontFamily: "var(--font-mono)", fontWeight: 700 }}
+                      title="Edit CMP directly (auto-saves)"
                     />
                     <button
                       onClick={() => handleFetchOne(h.id)}
@@ -3062,7 +3237,7 @@ function InvestmentsTab({
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Return %</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", color: "var(--color-gold)" }}>Holding XIRR</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Fundamentals & Notes</th>
-              <th style={{ padding: "12px 14px" }}></th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -3088,18 +3263,31 @@ function InvestmentsTab({
                   <tr key={h.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
                     {/* Stock & Company */}
                     <td style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         <span className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
                         <span style={{
                           padding: "2px 5px", borderRadius: 4, fontSize: 10, fontWeight: 700,
                           background: "var(--bg-elevated)", color: "var(--color-gold)"
                         }}>{h.exchange || "NSE"}</span>
-                        {h.companySize && (
-                          <span style={{
-                            padding: "2px 5px", borderRadius: 4, fontSize: 10,
-                            background: "var(--bg-elevated)", color: "var(--text-secondary)"
-                          }}>{h.companySize}</span>
-                        )}
+                        <button
+                          onClick={() => startEditHolding(h)}
+                          style={{
+                            background: "rgba(229, 184, 105, 0.12)",
+                            border: "1px solid var(--color-gold-border)",
+                            color: "var(--color-gold)",
+                            padding: "2px 7px",
+                            borderRadius: 4,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                          title="Click to edit all fields (stock name, price, qty, notes)"
+                        >
+                          <Pencil size={10} /> Edit
+                        </button>
                       </div>
                       {h.companyName && h.companyName !== h.stock && (
                         <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2, maxWidth: 180, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -3132,55 +3320,28 @@ function InvestmentsTab({
 
                     {/* Qty (Directly Editable) */}
                     <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
-                      <input
-                        type="number"
+                      <InlineHoldingInput
+                        initialValue={h.qty}
+                        onSave={val => updateHoldingField(h.id, "qty", val)}
                         min="1"
                         step="1"
-                        value={h.qty}
-                        onChange={e => updateHoldingField(h.id, "qty", e.target.value)}
-                        style={{
-                          width: 58,
-                          padding: "3px 6px",
-                          fontSize: 13,
-                          minHeight: 28,
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: 700,
-                          color: "var(--text-main)",
-                          background: "var(--bg-elevated)",
-                          border: "1px solid var(--border-subtle)",
-                          borderRadius: 6,
-                          textAlign: "right",
-                          outline: "none"
-                        }}
-                        title="Edit Quantity directly"
+                        width={60}
+                        placeholder="Qty"
+                        title="Edit Quantity directly (auto-saves)"
                       />
                     </td>
 
                     {/* Buy Price (Directly Editable) */}
                     <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>₹</span>
-                        <input
-                          type="number"
-                          step="0.05"
-                          value={h.buyPrice}
-                          onChange={e => updateHoldingField(h.id, "buyPrice", e.target.value)}
-                          style={{
-                            width: 78,
-                            padding: "3px 4px",
-                            fontSize: 13,
-                            minHeight: 26,
-                            fontFamily: "var(--font-mono)",
-                            fontWeight: 700,
-                            color: "var(--text-main)",
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            textAlign: "right"
-                          }}
-                          title="Edit Buy Price directly"
-                        />
-                      </div>
+                      <InlineHoldingInput
+                        initialValue={h.buyPrice}
+                        onSave={val => updateHoldingField(h.id, "buyPrice", val)}
+                        prefix="₹"
+                        step="0.05"
+                        width={75}
+                        placeholder="Price"
+                        title="Edit Buy Price directly (auto-saves)"
+                      />
                     </td>
 
                     {/* Total Invested */}
@@ -3190,28 +3351,15 @@ function InvestmentsTab({
 
                     {/* Current Market Price (CMP) Inline Quick Updater & Live Button */}
                     <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>₹</span>
-                        <input
-                          type="number"
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <InlineHoldingInput
+                          initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : h.buyPrice}
+                          onSave={val => updateHoldingField(h.id, "currentPrice", val)}
+                          prefix="₹"
                           step="0.05"
-                          value={h.currentPrice ?? ""}
+                          width={75}
                           placeholder={String(buy)}
-                          onChange={e => updateHoldingField(h.id, "currentPrice", e.target.value)}
-                          style={{
-                            width: 78,
-                            padding: "3px 4px",
-                            fontSize: 13,
-                            minHeight: 26,
-                            fontFamily: "var(--font-mono)",
-                            fontWeight: 700,
-                            color: "var(--text-main)",
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            textAlign: "right"
-                          }}
-                          title="Click to edit CMP directly"
+                          title="Edit CMP directly (auto-saves)"
                         />
                         <button
                           onClick={() => handleFetchOne(h.id)}
@@ -3221,8 +3369,8 @@ function InvestmentsTab({
                             border: "1px solid var(--color-gold-border)",
                             color: "var(--color-gold)",
                             borderRadius: 4,
-                            padding: "2px 5px",
-                            fontSize: 10,
+                            padding: "3px 6px",
+                            fontSize: 10.5,
                             fontWeight: 700,
                             cursor: fetchingId === h.id ? "wait" : "pointer",
                             whiteSpace: "nowrap"
@@ -3300,24 +3448,26 @@ function InvestmentsTab({
                     </td>
 
                     {/* Action Buttons */}
-                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textAlign: "center" }}>
+                      <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                         <button
                           onClick={() => startEditHolding(h)}
-                          className="btn-secondary"
                           style={{
-                            padding: "4px 9px",
+                            background: "var(--color-gold-soft)",
+                            border: "1px solid var(--color-gold-border)",
+                            color: "var(--color-gold)",
+                            padding: "6px 12px",
                             fontSize: 12,
-                            fontWeight: 600,
+                            fontWeight: 700,
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: 4,
+                            gap: 5,
                             borderRadius: 6,
                             cursor: "pointer",
                           }}
-                          title="Edit Full Investment Details"
+                          title="Edit Full Investment Details (Stock name, purchase price, qty, CMP, notes)"
                         >
-                          <Pencil size={12} /> Edit
+                          <Pencil size={13} /> Edit
                         </button>
                         {deleteConfirmId === h.id ? (
                           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -3361,7 +3511,7 @@ function InvestmentsTab({
                               background: "rgba(239, 68, 68, 0.1)",
                               border: "1px solid rgba(239, 68, 68, 0.25)",
                               color: "var(--color-loss-text)",
-                              padding: "4px 8px",
+                              padding: "6px 8px",
                               borderRadius: 6,
                               cursor: "pointer",
                               display: "inline-flex",
@@ -3369,7 +3519,7 @@ function InvestmentsTab({
                             }}
                             title="Delete Position"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={13} />
                           </button>
                         )}
                       </div>

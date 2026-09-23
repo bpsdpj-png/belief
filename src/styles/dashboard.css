@@ -44,42 +44,48 @@
 }
 
 [data-theme="light"] {
-  --bg-main: #F8F9FA;
+  /* Warm Alabaster & Champagne Linen Surfaces */
+  --bg-main: #FBF9F5;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F1F3F5;
-  --bg-elevated: #F1F3F7;
+  --bg-card-hover: #FAF7F2;
+  --bg-elevated: #F3EFE8;
   --bg-input: #FFFFFF;
-  --border-card: #E5E7EB;
-  --border-card-hover: rgba(217, 119, 6, 0.3);
-  --border-subtle: #E5E7EB;
-  --border-input: #D1D5DB;
 
-  --text-main: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
+  /* Delicate Warm Cashmere & Gold Borders */
+  --border-card: rgba(184, 150, 100, 0.22);
+  --border-card-hover: rgba(184, 134, 45, 0.45);
+  --border-subtle: rgba(184, 150, 100, 0.16);
+  --border-input: rgba(184, 150, 100, 0.32);
 
-  --color-gold: #D97706;
-  --color-gold-soft: rgba(217, 119, 6, 0.08);
-  --color-gold-border: rgba(217, 119, 6, 0.25);
+  /* Deep Espresso Obsidian Typography */
+  --text-main: #181512;
+  --text-secondary: #575047;
+  --text-muted: #8E8478;
 
-  --color-win: #059669;
-  --color-win-text: #059669;
-  --color-win-soft: rgba(5, 150, 105, 0.08);
-  --color-win-border: rgba(5, 150, 105, 0.22);
+  /* True Imperial Brushed Gold */
+  --color-gold: #B8860B;
+  --color-gold-soft: rgba(184, 134, 45, 0.1);
+  --color-gold-border: rgba(184, 134, 45, 0.32);
 
-  --color-loss: #E11D48;
-  --color-loss-text: #E11D48;
-  --color-loss-soft: rgba(225, 29, 72, 0.08);
-  --color-loss-border: rgba(225, 29, 72, 0.22);
+  /* Deep Emerald & Ruby Tones */
+  --color-win: #0D8259;
+  --color-win-text: #0B6B49;
+  --color-win-soft: rgba(13, 130, 89, 0.08);
+  --color-win-border: rgba(13, 130, 89, 0.22);
 
-  --chart-grid: #E5E7EB;
+  --color-loss: #BE123C;
+  --color-loss-text: #9F1239;
+  --color-loss-soft: rgba(190, 18, 60, 0.07);
+  --color-loss-border: rgba(190, 18, 60, 0.2);
+
+  --chart-grid: rgba(184, 150, 100, 0.12);
   --chart-tooltip-bg: #FFFFFF;
-  --chart-tooltip-border: #D1D5DB;
-  --chart-axis: #64748B;
+  --chart-tooltip-border: rgba(184, 150, 100, 0.32);
+  --chart-axis: #786E64;
 
-  --header-bg: rgba(248, 249, 250, 0.88);
+  --header-bg: rgba(251, 249, 245, 0.94);
   --tab-active-bg: #FFFFFF;
-  --tab-active-text: #111827;
+  --tab-active-text: #181512;
 }
 
 * {
@@ -175,8 +181,19 @@ button:active {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+[data-theme="light"] .glass-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(184, 140, 75, 0.22);
+  box-shadow: 0 1px 3px rgba(35, 25, 15, 0.04), 0 8px 24px -4px rgba(35, 25, 15, 0.07);
+}
+
 .glass-card:hover {
   border-color: var(--border-card-hover);
+}
+
+[data-theme="light"] .glass-card:hover {
+  border-color: rgba(184, 134, 45, 0.45);
+  box-shadow: 0 4px 6px rgba(35, 25, 15, 0.04), 0 12px 30px -4px rgba(184, 134, 45, 0.12);
 }
 
 /* Tab Pills */
@@ -190,6 +207,13 @@ button:active {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
+
+[data-theme="light"] .tab-pills-container {
+  background: rgba(184, 140, 75, 0.08);
+  border: 1px solid rgba(184, 140, 75, 0.18);
+  padding: 5px;
+}
+
 .tab-pills-container::-webkit-scrollbar {
   display: none;
 }
@@ -201,7 +225,7 @@ button:active {
   font-weight: 600;
   color: var(--text-secondary);
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -210,10 +234,26 @@ button:active {
   gap: 6px;
 }
 
+[data-theme="light"] .tab-pill {
+  color: #574F44;
+}
+
+[data-theme="light"] .tab-pill:hover {
+  color: #181512;
+  background: rgba(184, 140, 75, 0.06);
+}
+
 .tab-pill.active {
   background: var(--tab-active-bg);
   color: var(--tab-active-text);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .tab-pill.active {
+  background: #FFFFFF;
+  color: #181512;
+  border: 1px solid rgba(184, 134, 45, 0.32);
+  box-shadow: 0 2px 8px rgba(184, 134, 45, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .tab-pill-plan20cr {
@@ -226,6 +266,51 @@ button:active {
   border-color: var(--color-gold) !important;
   color: #FFFFFF !important;
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.3) !important;
+}
+
+[data-theme="light"] .tab-pill-plan20cr.active {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.16), rgba(184, 134, 45, 0.24)) !important;
+  border-color: #B8860B !important;
+  color: #78350F !important;
+  box-shadow: 0 2px 12px rgba(184, 134, 45, 0.2) !important;
+}
+
+/* Luxury Button & Input Classes */
+.btn-secondary {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+}
+
+[data-theme="light"] .btn-secondary {
+  background: #FFFFFF;
+  border: 1px solid rgba(184, 140, 75, 0.28);
+  color: #181512;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  border-color: #B8860B;
+  background: rgba(184, 134, 45, 0.06);
+}
+
+[data-theme="light"] header {
+  border-bottom: 1px solid rgba(184, 140, 75, 0.18);
+  box-shadow: 0 1px 3px rgba(35, 25, 15, 0.03);
+}
+
+[data-theme="light"] tr:hover {
+  background: rgba(184, 140, 75, 0.04);
+}
+
+[data-theme="light"] .mobile-modal {
+  box-shadow: 0 20px 50px rgba(35, 25, 15, 0.25) !important;
 }
 
 /* Mobile Responsiveness Rules */

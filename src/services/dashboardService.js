@@ -94,16 +94,24 @@ export function mapHoldingFromDb(row) {
 
 // Helper to convert UI holding object to database row
 export function mapHoldingToDb(holding) {
+  const buyNum = holding.buyPrice !== '' && holding.buyPrice != null ? Number(holding.buyPrice) : 0;
+  let curNum = null;
+  if (holding.currentPrice !== '' && holding.currentPrice != null && !isNaN(Number(holding.currentPrice))) {
+    curNum = Number(holding.currentPrice);
+  } else if (buyNum > 0) {
+    curNum = buyNum;
+  }
+
   return {
     id: holding.id,
     date: holding.date,
-    stock: holding.stock,
+    stock: (holding.stock || '').toUpperCase().trim(),
     company_name: holding.companyName || '',
     exchange: holding.exchange || 'NSE',
-    qty: holding.qty !== '' ? Number(holding.qty) : 0,
-    buy_price: holding.buyPrice !== '' ? Number(holding.buyPrice) : 0,
-    current_price: holding.currentPrice !== '' && holding.currentPrice !== null ? Number(holding.currentPrice) : null,
-    price_updated_on: holding.priceUpdatedOn || holding.date,
+    qty: holding.qty !== '' && holding.qty != null ? Number(holding.qty) : 0,
+    buy_price: buyNum,
+    current_price: curNum,
+    price_updated_on: holding.priceUpdatedOn || holding.date || new Date().toISOString().split('T')[0],
     pe_ratio: holding.peRatio !== '' && holding.peRatio != null ? Number(holding.peRatio) : null,
     beta: holding.beta !== '' && holding.beta != null ? Number(holding.beta) : null,
     company_size: holding.companySize || 'Large cap',
@@ -271,18 +279,43 @@ export const STOCK_PRICE_CATALOG = {
   BSE: 3270.70,
   COALINDIA: 424.55,
   "COAL INDIA": 424.55,
+  COAL: 424.55,
   NSE: 1850.00,
-  MSCI: 7.00,
-  MSEI: 7.00,
+  MSCI: 6.94,
+  MSEI: 6.94,
+  "METROPOLITAN STOCK EXCHANGE": 6.94,
   RELIANCE: 1385.50,
   HDFCBANK: 1682.00,
+  HDFC: 1682.00,
   INFY: 1912.00,
+  INFOSYS: 1912.00,
   TCS: 4125.00,
   ITC: 492.00,
   TATAMOTORS: 975.00,
+  "TATA MOTORS": 975.00,
   SBIN: 815.00,
+  SBI: 815.00,
   ICICIBANK: 1240.00,
+  ICICI: 1240.00,
   BHARTIARTL: 1650.00,
+  AIRTEL: 1650.00,
+  LT: 3580.00,
+  "L&T": 3580.00,
+  MARUTI: 12450.00,
+  HINDUNILVR: 2850.00,
+  HUL: 2850.00,
+  BAJFINANCE: 7120.00,
+  "BAJAJ FINANCE": 7120.00,
+  SUNPHARMA: 1890.00,
+  AXISBANK: 1210.00,
+  KOTAKBANK: 1780.00,
+  TITAN: 3680.00,
+  ADANIENT: 2950.00,
+  WIPRO: 540.00,
+  NTPC: 410.00,
+  ONGC: 295.00,
+  POWERGRID: 335.00,
+  TATASTEEL: 152.00,
 };
 
 /**
