@@ -21,6 +21,7 @@ import {
   persistSettings,
   syncAllToSupabase
 } from "../services/dashboardService";
+import Plan20CrTab from "./Plan20CrTab";
 import "../styles/dashboard.css";
 
 const RULE_DEFS = [
@@ -1071,11 +1072,12 @@ export default function Dashboard() {
             ["capital", "Capital & Ledger", <Wallet size={14} />],
             ["investments", `Holdings (${holdings.length})`, <PiggyBank size={14} />],
             ["discipline", "Discipline", <ShieldCheck size={14} />],
+            ["plan20cr", "🎯 ₹20 Cr Plan", <Target size={14} />],
           ].map(([key, label, icon]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`tab-pill ${tab === key ? "active" : ""}`}
+              className={`tab-pill ${tab === key ? "active" : ""} ${key === "plan20cr" ? "tab-pill-plan20cr" : ""}`}
             >
               {icon}
               {label}
@@ -1128,6 +1130,17 @@ export default function Dashboard() {
 
         {tab === "discipline" && (
           <DisciplineTab trades={tradesSorted} stats={stats} />
+        )}
+
+        {tab === "plan20cr" && (
+          <Plan20CrTab
+            stats={stats}
+            trades={trades}
+            ledger={ledger}
+            fmtINR={fmtINR}
+            fmtSigned={fmtSigned}
+            fmtPct={fmtPct}
+          />
         )}
       </main>
 

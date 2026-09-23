@@ -1,0 +1,150 @@
+[
+  {
+    "period": "Jan-Mar 2027",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 1000000,
+    "dailyProfit": 12500,
+    "dailyStopLoss": -6382.06,
+    "netProfit": 392561.47,
+    "newCapital": 1392561.47
+  },
+  {
+    "period": "Apr-Jun 2027",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 1392561.47,
+    "dailyProfit": 17407.02,
+    "dailyStopLoss": -8887.41,
+    "netProfit": 546665.98,
+    "newCapital": 1939227.45
+  },
+  {
+    "period": "Jul-Sep 2027",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 1939227.45,
+    "dailyProfit": 24240.34,
+    "dailyStopLoss": -12376.26,
+    "netProfit": 761265.98,
+    "newCapital": 2700493.42
+  },
+  {
+    "period": "Oct-Dec 2027",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 2700493.42,
+    "dailyProfit": 33756.17,
+    "dailyStopLoss": -17234.71,
+    "netProfit": 1060107.67,
+    "newCapital": 3760601.09
+  },
+  {
+    "period": "Jan-Mar 2028",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 3760601.09,
+    "dailyProfit": 47007.51,
+    "dailyStopLoss": -24000.29,
+    "netProfit": 1476267.88,
+    "newCapital": 5236870.97
+  },
+  {
+    "period": "Apr-Jun 2028",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 5236870.97,
+    "dailyProfit": 65460.89,
+    "dailyStopLoss": -33422.02,
+    "netProfit": 2055793.77,
+    "newCapital": 7292664.74
+  },
+  {
+    "period": "Jul-Sep 2028",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 7292664.74,
+    "dailyProfit": 91158.31,
+    "dailyStopLoss": -46542.22,
+    "netProfit": 2862819.19,
+    "newCapital": 10155483.93,
+    "milestone": "₹1 Crore"
+  },
+  {
+    "period": "Oct-Dec 2028",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 10155483.93,
+    "dailyProfit": 126943.55,
+    "dailyStopLoss": -64812.9,
+    "netProfit": 3986651.7,
+    "newCapital": 14142135.62
+  },
+  {
+    "period": "Jan-Mar 2029",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 14142135.62,
+    "dailyProfit": 176776.7,
+    "dailyStopLoss": -90255.94,
+    "netProfit": 5551657.55,
+    "newCapital": 19693793.17
+  },
+  {
+    "period": "Apr-Jun 2029",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 19693793.17,
+    "dailyProfit": 246172.41,
+    "dailyStopLoss": -125686.95,
+    "netProfit": 7731024.4,
+    "newCapital": 27424817.57
+  },
+  {
+    "period": "Jul-Sep 2029",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 27424817.57,
+    "dailyProfit": 342810.22,
+    "dailyStopLoss": -175026.8,
+    "netProfit": 10765926.7,
+    "newCapital": 38190744.26
+  },
+  {
+    "period": "Oct-Dec 2029",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 38190744.26,
+    "dailyProfit": 477384.3,
+    "dailyStopLoss": -243735.58,
+    "netProfit": 14992214.71,
+    "newCapital": 53182958.97,
+    "milestone": "₹5 Crore"
+  },
+  {
+    "period": "Jan-Mar 2030",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 53182958.97,
+    "dailyProfit": 664786.99,
+    "dailyStopLoss": -339416.78,
+    "netProfit": 20877580.55,
+    "newCapital": 74060539.52
+  },
+  {
+    "period": "Apr-Jun 2030",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 74060539.52,
+    "dailyProfit": 925756.74,
+    "dailyStopLoss": -472658.73,
+    "netProfit": 29073314.26,
+    "newCapital": 103133853.77,
+    "milestone": "₹10 Crore"
+  },
+  {
+    "period": "Jul-Sep 2030",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 103133853.77,
+    "dailyProfit": 1289173.17,
+    "dailyStopLoss": -658206.33,
+    "netProfit": 40486377.23,
+    "newCapital": 143620231.01
+  },
+  {
+    "period": "Oct-Dec 2030",
+    "days": "36 profit · 9 stop loss days",
+    "opening": 143620231.01,
+    "dailyProfit": 1795252.89,
+    "dailyStopLoss": -916392.77,
+    "netProfit": 56379768.99,
+    "newCapital": 200000000,
+    "milestone": "₹20 Crore Goal"
+  }
+]
