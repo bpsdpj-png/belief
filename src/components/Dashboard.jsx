@@ -91,8 +91,15 @@ const toLocalISODate = (d) => {
 };
 const todayLocalISO = () => toLocalISODate(new Date());
 
+const generateId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 9);
+};
+
 const emptyTrade = () => ({
-  id: crypto.randomUUID(),
+  id: generateId(),
   date: todayLocalISO(),
   index: "NIFTY",
   strategy: "Straddle",
@@ -123,7 +130,7 @@ const emptyStockDetails = () => ({
 });
 
 const emptyLedger = () => ({
-  id: crypto.randomUUID(),
+  id: generateId(),
   date: todayLocalISO(),
   type: "Deposit",
   withdrawalUse: "cash", // "cash" or "stock"
@@ -135,7 +142,7 @@ const emptyLedger = () => ({
 });
 
 const emptyHolding = () => ({
-  id: crypto.randomUUID(),
+  id: generateId(),
   date: todayLocalISO(),
   stock: "",
   companyName: "",
@@ -387,7 +394,7 @@ export default function Dashboard() {
     const downsideFromStart = minEquityFromStart - startingCapital;
     const downsideFromStartPct = startingCapital > 0 ? (downsideFromStart / startingCapital) * 100 : 0;
 
-    const profitWithdrawalDeficit = totalNet - withdrawals;
+    const profitWithdrawalDeficit = totalNet - totalWithdrawals;
 
     const dayPnls = Object.values(dayMap);
     const profitableDays = dayPnls.filter(v => v > 0).length;
@@ -491,7 +498,7 @@ export default function Dashboard() {
         if (dbStatus.tablesReady) await persistTrade(updated);
         setEditingTradeId(null);
       } else {
-        const created = { ...tradeDraft, id: tradeDraft.id || crypto.randomUUID() };
+        const created = { ...tradeDraft, id: tradeDraft.id || generateId() };
         setTrades(prev => [...prev, created]);
         if (dbStatus.tablesReady) await persistTrade(created);
       }
@@ -620,14 +627,14 @@ export default function Dashboard() {
         }
       }
 
-      const ledgerId = editingLedgerId || ledgerDraft.id || crypto.randomUUID();
+      const ledgerId = editingLedgerId || ledgerDraft.id || generateId();
       let holdingId = ledgerDraft.holdingId || null;
 
       // If stock investment, sync to holdings
       if (isStockInvestment && (ledgerDraft.stockDetails?.stock || ledgerDraft.stockDetails?.companyName)) {
         const stockSymbol = (ledgerDraft.stockDetails.stock || ledgerDraft.stockDetails.companyName).toUpperCase().trim();
         const existingHolding = holdings.find(h => (holdingId && h.id === holdingId) || h.ledgerId === ledgerId || h.stock === stockSymbol);
-        const resolvedHoldingId = existingHolding ? existingHolding.id : (holdingId || crypto.randomUUID());
+        const resolvedHoldingId = existingHolding ? existingHolding.id : (holdingId || generateId());
         holdingId = resolvedHoldingId;
 
         const holdingObj = {
@@ -700,7 +707,7 @@ export default function Dashboard() {
     if (!withdrawDraft.amount) return;
     setSaveState("saving");
     try {
-      const created = { id: crypto.randomUUID(), type: "Withdrawal", withdrawalUse: "cash", ...withdrawDraft };
+      const created = { id: generateId(), type: "Withdrawal", withdrawalUse: "cash", ...withdrawDraft };
       setLedger(prev => [...prev, created]);
       if (dbStatus.tablesReady) await persistLedger(created);
       setWithdrawDraft({ date: todayLocalISO(), amount: "", note: "" });
@@ -773,7 +780,7 @@ export default function Dashboard() {
   const addHolding = async () => {
     setSaveState("saving");
     try {
-      const holdingId = editingHoldingId || holdingDraft.id || crypto.randomUUID();
+      const holdingId = editingHoldingId || holdingDraft.id || generateId();
       const buyPriceNum = Number(holdingDraft.buyPrice) || 0;
       const qtyNum = Number(holdingDraft.qty) || 0;
       const totalCost = buyPriceNum * qtyNum;
@@ -797,7 +804,7 @@ export default function Dashboard() {
         // If deductFromTradingCapital is checked, record matching capital movement
         if (holdingDraft.deductFromTradingCapital && totalCost > 0) {
           const ledgerEntry = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             date: holdingDraft.date,
             type: "Withdrawal",
             withdrawalUse: "stock",
