@@ -1,0 +1,265 @@
+/* src/styles/dashboard.css - Modern Executive Financial Theme */
+
+:root {
+  /* Dark Theme (Default) */
+  --bg-main: #0B0F19;
+  --bg-card: #111827;
+  --bg-card-hover: #162032;
+  --bg-elevated: #1E293B;
+  --bg-input: #151D2C;
+  --border-card: rgba(255, 255, 255, 0.07);
+  --border-card-hover: rgba(245, 158, 11, 0.25);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-input: rgba(255, 255, 255, 0.12);
+
+  --text-main: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+
+  --color-gold: #F59E0B;
+  --color-gold-soft: rgba(245, 158, 11, 0.15);
+  --color-gold-border: rgba(245, 158, 11, 0.35);
+
+  --color-win: #10B981;
+  --color-win-text: #34D399;
+  --color-win-soft: rgba(16, 185, 129, 0.12);
+  --color-win-border: rgba(16, 185, 129, 0.25);
+
+  --color-loss: #F43F5E;
+  --color-loss-text: #FB7185;
+  --color-loss-soft: rgba(244, 63, 94, 0.12);
+  --color-loss-border: rgba(244, 63, 94, 0.25);
+
+  --chart-grid: rgba(255, 255, 255, 0.05);
+  --chart-tooltip-bg: #182234;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.12);
+  --chart-axis: #64748B;
+
+  --header-bg: rgba(11, 15, 25, 0.85);
+  --tab-active-bg: #1E293B;
+  --tab-active-text: #F8FAFC;
+}
+
+[data-theme="light"] {
+  --bg-main: #F4F6F9;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F8FAFC;
+  --bg-elevated: #F1F5F9;
+  --bg-input: #FFFFFF;
+  --border-card: #E2E8F0;
+  --border-card-hover: rgba(217, 119, 6, 0.3);
+  --border-subtle: #E2E8F0;
+  --border-input: #CBD5E1;
+
+  --text-main: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  --color-gold: #D97706;
+  --color-gold-soft: rgba(217, 119, 6, 0.1);
+  --color-gold-border: rgba(217, 119, 6, 0.3);
+
+  --color-win: #059669;
+  --color-win-text: #059669;
+  --color-win-soft: rgba(5, 150, 105, 0.08);
+  --color-win-border: rgba(5, 150, 105, 0.25);
+
+  --color-loss: #E11D48;
+  --color-loss-text: #E11D48;
+  --color-loss-soft: rgba(225, 29, 72, 0.08);
+  --color-loss-border: rgba(225, 29, 72, 0.25);
+
+  --chart-grid: #E2E8F0;
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-border: #CBD5E1;
+  --chart-axis: #64748B;
+
+  --header-bg: rgba(244, 246, 249, 0.85);
+  --tab-active-bg: #FFFFFF;
+  --tab-active-text: #0F172A;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.script-brand {
+  font-family: 'Kaushan Script', cursive;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Inputs & Form Controls */
+input, select, textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 44px; /* Touch-friendly height */
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px var(--color-gold-soft);
+}
+
+label {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Buttons */
+button {
+  font-family: inherit;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Glass Card */
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--border-card-hover);
+}
+
+/* Tab Pills */
+.tab-pills-container {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tab-pills-container::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-pill {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-pill.active {
+  background: var(--tab-active-bg);
+  color: var(--tab-active-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Mobile Responsiveness Rules */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: block !important;
+  }
+  .mobile-flex {
+    display: flex !important;
+  }
+  .mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .mobile-stack {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+  }
+  .mobile-padding {
+    padding: 14px !important;
+  }
+  .mobile-modal {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90vh !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+  .equity-chart-card {
+    grid-column: span 1 !important;
+  }
+  .daily-focus-banner {
+    flex-wrap: wrap !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .desktop-only {
+    display: block !important;
+  }
+  .desktop-flex {
+    display: flex !important;
+  }
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) {
+  .equity-chart-card {
+    grid-column: span 2;
+  }
+}
+
