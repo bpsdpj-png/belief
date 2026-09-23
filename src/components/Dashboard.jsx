@@ -22,6 +22,7 @@ import {
   syncAllToSupabase
 } from "../services/dashboardService";
 import Plan20CrTab from "./Plan20CrTab";
+import DailyHabitsTab from "./DailyHabitsTab";
 import "../styles/dashboard.css";
 
 const RULE_DEFS = [
@@ -797,6 +798,19 @@ export default function Dashboard() {
       if (editingHoldingId) {
         setHoldings(prev => prev.map(h => (h.id === editingHoldingId ? holdingObj : h)));
         if (dbStatus.tablesReady) await persistHolding(holdingObj);
+
+        // Keep linked ledger entry in sync if it exists
+        const linkedLedger = ledger.find(l => l.holdingId === editingHoldingId || l.id === holdingObj.ledgerId);
+        if (linkedLedger) {
+          const updatedLedger = {
+            ...linkedLedger,
+            amount: totalCost > 0 ? String(totalCost) : linkedLedger.amount,
+            stockSymbol: holdingObj.stock,
+            note: `Stock purchase: ${holdingObj.stock} (${holdingObj.companyName || holdingObj.stock})`,
+          };
+          setLedger(prev => prev.map(l => (l.id === linkedLedger.id ? updatedLedger : l)));
+          if (dbStatus.tablesReady) await persistLedger(updatedLedger);
+        }
         setEditingHoldingId(null);
       } else {
         setHoldings(prev => [...prev, holdingObj]);
@@ -1071,6 +1085,7 @@ export default function Dashboard() {
             ["trades", `Trade Log (${trades.length})`, <Briefcase size={14} />],
             ["capital", "Capital & Ledger", <Wallet size={14} />],
             ["investments", `Equity Investments (${holdings.length})`, <Briefcase size={14} />],
+            ["habits", "Daily Habits", <CheckCircle2 size={14} />],
             ["discipline", "Discipline", <ShieldCheck size={14} />],
             ["plan20cr", "🎯 ₹20 Cr Plan", <Target size={14} />],
           ].map(([key, label, icon]) => (
@@ -1122,10 +1137,14 @@ export default function Dashboard() {
             holdings={holdings}
             stats={stats}
             openNewHoldingForm={() => { setHoldingDraft(emptyHolding()); setEditingHoldingId(null); setShowHoldingForm(true); }}
-            startEditHolding={(h) => { setHoldingDraft({ ...h }); setEditingHoldingId(h.id); setShowHoldingForm(true); }}
+            startEditHolding={startEditHolding}
             deleteHolding={deleteHolding}
             updateHoldingPrice={updateHoldingPrice}
           />
+        )}
+
+        {tab === "habits" && (
+          <DailyHabitsTab />
         )}
 
         {tab === "discipline" && (
@@ -2690,9 +2709,40 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }} title="Edit"><Pencil size={15} /></button>
-                    <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }} title="Delete"><Trash2 size={15} /></button>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <button
+                      onClick={() => startEditHolding(h)}
+                      className="btn-secondary"
+                      style={{
+                        padding: "5px 9px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                      title="Edit Full Investment Details"
+                    >
+                      <Pencil size={12} /> Edit
+                    </button>
+                    <button
+                      onClick={() => deleteHolding(h.id)}
+                      style={{
+                        background: "rgba(239, 68, 68, 0.1)",
+                        border: "1px solid rgba(239, 68, 68, 0.25)",
+                        color: "var(--color-loss-text)",
+                        padding: "5px 8px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
 
@@ -2974,10 +3024,41 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                     </td>
 
                     {/* Action Buttons */}
-                    <td style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => startEditHolding(h)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }} title="Edit Full Details"><Pencil size={15} /></button>
-                        <button onClick={() => deleteHolding(h.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 4 }} title="Delete"><Trash2 size={15} /></button>
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button
+                          onClick={() => startEditHolding(h)}
+                          className="btn-secondary"
+                          style={{
+                            padding: "4px 9px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                          }}
+                          title="Edit Full Investment Details"
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button
+                          onClick={() => deleteHolding(h.id)}
+                          style={{
+                            background: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.25)",
+                            color: "var(--color-loss-text)",
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                          }}
+                          title="Delete Position"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </td>
                   </tr>

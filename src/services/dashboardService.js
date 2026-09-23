@@ -323,3 +323,69 @@ export async function syncAllToSupabase({ startingCapital, targetPct, trades, le
 
   return results;
 }
+
+const HABITS_CACHE_KEY = 'belief-habits-cache-v1';
+
+export function loadLocalHabitsCache() {
+  try {
+    const raw = localStorage.getItem(HABITS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveLocalHabitsCache(data) {
+  try {
+    localStorage.setItem(HABITS_CACHE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Could not save local habits cache', e);
+  }
+}
+
+export async function loadDailyHabitsFromDb() {
+  try {
+    const { data, error } = await supabase.from('daily_habits').select('*').order('date', { ascending: false });
+    if (error) {
+      console.warn('Could not load habits from Supabase:', error.message);
+      return loadLocalHabitsCache();
+    }
+    const habitMap = {};
+    if (data && data.length > 0) {
+      data.forEach(row => {
+        habitMap[row.date] = {
+          habits: row.habits || {},
+          completedCount: row.completed_count || 0,
+        };
+      });
+      saveLocalHabitsCache(habitMap);
+    } else {
+      return loadLocalHabitsCache();
+    }
+    return habitMap;
+  } catch (e) {
+    return loadLocalHabitsCache();
+  }
+}
+
+export async function persistDailyHabitToDb({ date, habits, completedCount }) {
+  // Update local cache immediately
+  const cache = loadLocalHabitsCache();
+  cache[date] = { habits, completedCount };
+  saveLocalHabitsCache(cache);
+
+  // Sync to Supabase
+  try {
+    const { error } = await supabase.from('daily_habits').upsert({
+      date,
+      habits,
+      completed_count: completedCount,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'date' });
+    if (error) console.warn('Failed to upsert habit to Supabase:', error.message);
+    return { error };
+  } catch (e) {
+    console.warn('Network error saving habit:', e);
+    return { error: e };
+  }
+}
