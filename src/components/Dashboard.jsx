@@ -19,7 +19,9 @@ import {
   persistHolding,
   removeHoldingFromDb,
   persistSettings,
-  syncAllToSupabase
+  syncAllToSupabase,
+  fetchStockQuote,
+  STOCK_PRICE_CATALOG
 } from "../services/dashboardService";
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
@@ -844,11 +846,18 @@ export default function Dashboard() {
   };
 
   const deleteHolding = async (id) => {
-    if (!confirm("Are you sure you want to delete this equity holding?")) return;
     setSaveState("saving");
     try {
+      const target = holdings.find(h => h.id === id);
       setHoldings(prev => prev.filter(h => h.id !== id));
-      if (dbStatus.tablesReady) await removeHoldingFromDb(id);
+      if (dbStatus.tablesReady) {
+        await removeHoldingFromDb(id);
+        const linked = ledger.find(l => l.holdingId === id || (target && l.id === target.ledgerId));
+        if (linked) {
+          setLedger(prev => prev.filter(l => l.id !== linked.id));
+          await removeLedgerFromDb(linked.id);
+        }
+      }
       if (editingHoldingId === id) cancelHoldingForm();
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
@@ -858,15 +867,78 @@ export default function Dashboard() {
     }
   };
 
-  const updateHoldingPrice = async (id, val) => {
-    setHoldings(prev => prev.map(h => (h.id === id ? { ...h, currentPrice: val } : h)));
-    const target = holdings.find(h => h.id === id);
-    if (target && dbStatus.tablesReady) {
+  const updateHoldingField = async (id, field, val) => {
+    let updatedTarget = null;
+    setHoldings(prev => {
+      return prev.map(h => {
+        if (h.id !== id) return h;
+        const updated = { ...h, [field]: val };
+        if (field === "currentPrice" || field === "buyPrice") {
+          updated.priceUpdatedOn = todayLocalISO();
+        }
+        updatedTarget = updated;
+        return updated;
+      });
+    });
+
+    if (updatedTarget && dbStatus.tablesReady) {
       try {
-        await persistHolding({ ...target, currentPrice: val });
+        await persistHolding(updatedTarget);
+        if (field === "qty" || field === "buyPrice") {
+          const qtyN = Number(field === "qty" ? val : updatedTarget.qty) || 0;
+          const buyN = Number(field === "buyPrice" ? val : updatedTarget.buyPrice) || 0;
+          const cost = qtyN * buyN;
+          const linked = ledger.find(l => l.holdingId === id || l.id === updatedTarget.ledgerId);
+          if (linked && cost > 0) {
+            const updatedLedger = { ...linked, amount: String(cost) };
+            setLedger(prev => prev.map(l => (l.id === linked.id ? updatedLedger : l)));
+            await persistLedger(updatedLedger);
+          }
+        }
       } catch (e) {
-        console.warn("Failed to update holding price in Supabase:", e);
+        console.warn("Failed to persist holding field update:", e);
       }
+    }
+  };
+
+  const [fetchingQuotes, setFetchingQuotes] = useState(false);
+  const [quoteFetchStatus, setQuoteFetchStatus] = useState("");
+
+  const fetchHoldingLiveCMP = async (id) => {
+    const target = holdings.find(h => h.id === id);
+    if (!target) return;
+    try {
+      const q = await fetchStockQuote(target.stock);
+      if (q && q.price != null) {
+        await updateHoldingField(id, "currentPrice", q.price);
+        return q.price;
+      }
+    } catch (e) {
+      console.warn("Quote fetch error:", e);
+    }
+  };
+
+  const fetchAllLiveCMPs = async () => {
+    if (fetchingQuotes) return;
+    setFetchingQuotes(true);
+    setQuoteFetchStatus("Fetching live market prices...");
+    try {
+      let count = 0;
+      for (const h of holdings) {
+        const q = await fetchStockQuote(h.stock);
+        if (q && q.price != null) {
+          await updateHoldingField(h.id, "currentPrice", q.price);
+          count++;
+        }
+      }
+      setQuoteFetchStatus(`Updated ${count} stock prices!`);
+      setTimeout(() => setQuoteFetchStatus(""), 3500);
+    } catch (e) {
+      console.warn("Bulk quote fetch error:", e);
+      setQuoteFetchStatus("Could not fetch some prices.");
+      setTimeout(() => setQuoteFetchStatus(""), 3500);
+    } finally {
+      setFetchingQuotes(false);
     }
   };
 
@@ -1139,7 +1211,11 @@ export default function Dashboard() {
             openNewHoldingForm={() => { setHoldingDraft(emptyHolding()); setEditingHoldingId(null); setShowHoldingForm(true); }}
             startEditHolding={startEditHolding}
             deleteHolding={deleteHolding}
-            updateHoldingPrice={updateHoldingPrice}
+            updateHoldingField={updateHoldingField}
+            fetchHoldingLiveCMP={fetchHoldingLiveCMP}
+            fetchAllLiveCMPs={fetchAllLiveCMPs}
+            fetchingQuotes={fetchingQuotes}
+            quoteFetchStatus={quoteFetchStatus}
           />
         )}
 
@@ -2425,10 +2501,29 @@ function calcHoldingXIRR(dateStr, invested, curVal) {
 }
 
 // Equity Investments Tab Component
-function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding, deleteHolding, updateHoldingPrice }) {
+function InvestmentsTab({
+  holdings,
+  stats,
+  openNewHoldingForm,
+  startEditHolding,
+  deleteHolding,
+  updateHoldingField,
+  fetchHoldingLiveCMP,
+  fetchAllLiveCMPs,
+  fetchingQuotes,
+  quoteFetchStatus,
+}) {
   const [search, setSearch] = useState("");
   const [capFilter, setCapFilter] = useState("ALL");
   const [valFilter, setValFilter] = useState("ALL");
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [fetchingId, setFetchingId] = useState(null);
+
+  const handleFetchOne = async (id) => {
+    setFetchingId(id);
+    await fetchHoldingLiveCMP(id);
+    setFetchingId(null);
+  };
 
   const totalInvested = stats?.holdingsInvested || 0;
   const totalCurVal = stats?.holdingsCurrentValue || 0;
@@ -2538,26 +2633,49 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div style={{ textAlign: "right" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ textAlign: "right", marginRight: 6 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Portfolio Return</div>
               <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color: totalUnrealized >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                 {fmtPct(totalReturnPct)}
               </div>
             </div>
             <button
+              onClick={fetchAllLiveCMPs}
+              disabled={fetchingQuotes}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "rgba(229, 184, 105, 0.12)",
+                color: "var(--color-gold)",
+                border: "1px solid var(--color-gold-border)",
+                borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700,
+                cursor: fetchingQuotes ? "wait" : "pointer",
+                whiteSpace: "nowrap"
+              }}
+              title="Automatically fetch real-time market prices for all portfolio holdings"
+            >
+              <RefreshCw size={14} className={fetchingQuotes ? "spin" : ""} />
+              {fetchingQuotes ? "Fetching..." : "⚡ Live CMPs"}
+            </button>
+            <button
               onClick={openNewHoldingForm}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
                 color: "#0F172A", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                boxShadow: "0 2px 10px rgba(245, 158, 11, 0.3)"
+                boxShadow: "0 2px 10px rgba(245, 158, 11, 0.3)",
+                whiteSpace: "nowrap"
               }}
             >
               <Plus size={16} strokeWidth={2.5} />
               Add Stock Investment
             </button>
           </div>
+          {quoteFetchStatus && (
+            <div style={{ width: "100%", fontSize: 12, color: "var(--color-win-text)", fontWeight: 600, textAlign: "right" }}>
+              {quoteFetchStatus}
+            </div>
+          )}
         </div>
 
         {/* Market Cap Allocation Bar */}
@@ -2727,74 +2845,170 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                     >
                       <Pencil size={12} /> Edit
                     </button>
-                    <button
-                      onClick={() => deleteHolding(h.id)}
-                      style={{
-                        background: "rgba(239, 68, 68, 0.1)",
-                        border: "1px solid rgba(239, 68, 68, 0.25)",
-                        color: "var(--color-loss-text)",
-                        padding: "5px 8px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                      title="Delete"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {deleteConfirmId === h.id ? (
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        <button
+                          onClick={() => {
+                            deleteHolding(h.id);
+                            setDeleteConfirmId(null);
+                          }}
+                          style={{
+                            background: "var(--color-loss)",
+                            color: "#FFFFFF",
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "5px 8px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          Confirm Delete?
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--text-muted)",
+                            padding: 4,
+                            cursor: "pointer"
+                          }}
+                          title="Cancel"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteConfirmId(h.id)}
+                        style={{
+                          background: "rgba(239, 68, 68, 0.1)",
+                          border: "1px solid rgba(239, 68, 68, 0.25)",
+                          color: "var(--color-loss-text)",
+                          padding: "5px 8px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
+                        title="Delete Position"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Key Metrics Grid */}
+                {/* Editable Metrics Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 10, marginBottom: 12 }}>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Qty · Purchase Price</div>
-                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
-                      {qty} @ {fmtINR(buy)}
-                    </div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Shares (Qty)</div>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={h.qty}
+                      onChange={e => updateHoldingField(h.id, "qty", e.target.value)}
+                      style={{
+                        marginTop: 4,
+                        padding: "5px 8px",
+                        fontSize: 13,
+                        minHeight: 32,
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-input)",
+                        borderRadius: 6,
+                      }}
+                      placeholder="Qty"
+                      title="Edit Quantity directly"
+                    />
+                  </div>
+                  <div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Buy Price (₹)</div>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={h.buyPrice}
+                      onChange={e => updateHoldingField(h.id, "buyPrice", e.target.value)}
+                      style={{
+                        marginTop: 4,
+                        padding: "5px 8px",
+                        fontSize: 13,
+                        minHeight: 32,
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-input)",
+                        borderRadius: 6,
+                      }}
+                      placeholder="Buy Price"
+                      title="Edit Buy Price directly"
+                    />
                   </div>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Total Cost Basis</div>
-                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 4 }}>
                       {fmtINR(invested)}
                     </div>
                   </div>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Current Value</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 13, color: "var(--text-main)", marginTop: 4 }}>
                       {fmtINR(curVal)}
                     </div>
                   </div>
-                  <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Unrealized P&L</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginTop: 2 }}>
+                  <div style={{ gridColumn: "span 2", paddingTop: 4, borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Unrealized P&L</span>
+                    <span className="mono" style={{ fontWeight: 800, fontSize: 13.5, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                       {fmtSigned(pnl)} ({fmtPct(pnlPct)})
-                    </div>
+                    </span>
                   </div>
                 </div>
 
                 {/* CMP Quick Updater + Individual Stock XIRR Badge */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(245, 158, 11, 0.04)", borderRadius: 10, border: "1px solid var(--border-subtle)", marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>Current Price (CMP):</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(229, 184, 105, 0.05)", borderRadius: 10, border: "1px solid var(--border-subtle)", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 180px" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>CMP (₹):</span>
                     <input
                       type="number"
                       step="0.05"
-                      value={h.currentPrice}
+                      value={h.currentPrice ?? ""}
                       placeholder={String(buy)}
-                      onChange={e => updateHoldingPrice(h.id, e.target.value)}
-                      style={{ width: 90, padding: "5px 8px", fontSize: 13, minHeight: 32, fontFamily: "var(--font-mono)", fontWeight: 700 }}
+                      onChange={e => updateHoldingField(h.id, "currentPrice", e.target.value)}
+                      style={{ width: 85, padding: "5px 8px", fontSize: 13, minHeight: 32, fontFamily: "var(--font-mono)", fontWeight: 700 }}
                     />
+                    <button
+                      onClick={() => handleFetchOne(h.id)}
+                      disabled={fetchingId === h.id}
+                      style={{
+                        background: "rgba(229, 184, 105, 0.15)",
+                        border: "1px solid var(--color-gold-border)",
+                        color: "var(--color-gold)",
+                        borderRadius: 6,
+                        padding: "6px 8px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: fetchingId === h.id ? "wait" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        whiteSpace: "nowrap",
+                      }}
+                      title="Fetch live market price"
+                    >
+                      ⚡ {fetchingId === h.id ? "..." : "Live"}
+                    </button>
                   </div>
 
-                  {/* Individual Stock XIRR */}
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Holding XIRR</div>
+                    <div style={{ fontSize: 9.5, color: "var(--text-muted)", textTransform: "uppercase" }}>Holding XIRR</div>
                     <div
                       className="mono"
                       style={{
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: 800,
                         color: (holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
                       }}
@@ -2916,14 +3130,57 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                       <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{daysHeld}d held</div>
                     </td>
 
-                    {/* Qty */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 600 }}>
-                      {qty}
+                    {/* Qty (Directly Editable) */}
+                    <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={h.qty}
+                        onChange={e => updateHoldingField(h.id, "qty", e.target.value)}
+                        style={{
+                          width: 58,
+                          padding: "3px 6px",
+                          fontSize: 13,
+                          minHeight: 28,
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: 700,
+                          color: "var(--text-main)",
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: 6,
+                          textAlign: "right",
+                          outline: "none"
+                        }}
+                        title="Edit Quantity directly"
+                      />
                     </td>
 
-                    {/* Buy Price */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right" }}>
-                      {fmtINR(buy)}
+                    {/* Buy Price (Directly Editable) */}
+                    <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>₹</span>
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={h.buyPrice}
+                          onChange={e => updateHoldingField(h.id, "buyPrice", e.target.value)}
+                          style={{
+                            width: 78,
+                            padding: "3px 4px",
+                            fontSize: 13,
+                            minHeight: 26,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 700,
+                            color: "var(--text-main)",
+                            background: "transparent",
+                            border: "none",
+                            outline: "none",
+                            textAlign: "right"
+                          }}
+                          title="Edit Buy Price directly"
+                        />
+                      </div>
                     </td>
 
                     {/* Total Invested */}
@@ -2931,30 +3188,49 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                       {fmtINR(invested)}
                     </td>
 
-                    {/* Current Market Price (CMP) Inline Quick Updater */}
-                    <td style={{ padding: "12px 14px", textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                    {/* Current Market Price (CMP) Inline Quick Updater & Live Button */}
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
                         <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>₹</span>
                         <input
                           type="number"
                           step="0.05"
-                          value={h.currentPrice}
+                          value={h.currentPrice ?? ""}
                           placeholder={String(buy)}
-                          onChange={e => updateHoldingPrice(h.id, e.target.value)}
+                          onChange={e => updateHoldingField(h.id, "currentPrice", e.target.value)}
                           style={{
-                            width: 85,
-                            padding: "4px 6px",
+                            width: 78,
+                            padding: "3px 4px",
                             fontSize: 13,
-                            minHeight: 28,
+                            minHeight: 26,
                             fontFamily: "var(--font-mono)",
                             fontWeight: 700,
                             color: "var(--text-main)",
                             background: "transparent",
                             border: "none",
-                            outline: "none"
+                            outline: "none",
+                            textAlign: "right"
                           }}
                           title="Click to edit CMP directly"
                         />
+                        <button
+                          onClick={() => handleFetchOne(h.id)}
+                          disabled={fetchingId === h.id}
+                          style={{
+                            background: "rgba(229, 184, 105, 0.15)",
+                            border: "1px solid var(--color-gold-border)",
+                            color: "var(--color-gold)",
+                            borderRadius: 4,
+                            padding: "2px 5px",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: fetchingId === h.id ? "wait" : "pointer",
+                            whiteSpace: "nowrap"
+                          }}
+                          title="Fetch real-time market price"
+                        >
+                          ⚡ {fetchingId === h.id ? "..." : "Live"}
+                        </button>
                       </div>
                       {h.priceUpdatedOn && (
                         <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
@@ -3043,22 +3319,59 @@ function InvestmentsTab({ holdings, stats, openNewHoldingForm, startEditHolding,
                         >
                           <Pencil size={12} /> Edit
                         </button>
-                        <button
-                          onClick={() => deleteHolding(h.id)}
-                          style={{
-                            background: "rgba(239, 68, 68, 0.1)",
-                            border: "1px solid rgba(239, 68, 68, 0.25)",
-                            color: "var(--color-loss-text)",
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                          }}
-                          title="Delete Position"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        {deleteConfirmId === h.id ? (
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <button
+                              onClick={() => {
+                                deleteHolding(h.id);
+                                setDeleteConfirmId(null);
+                              }}
+                              style={{
+                                background: "var(--color-loss)",
+                                color: "#FFFFFF",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              Confirm Delete?
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "var(--text-muted)",
+                                padding: "4px",
+                                cursor: "pointer"
+                              }}
+                              title="Cancel"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(h.id)}
+                            style={{
+                              background: "rgba(239, 68, 68, 0.1)",
+                              border: "1px solid rgba(239, 68, 68, 0.25)",
+                              color: "var(--color-loss-text)",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                            }}
+                            title="Delete Position"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

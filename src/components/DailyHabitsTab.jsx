@@ -17,16 +17,16 @@ import {
 
 export const HABIT_LIST = [
   { id: "surya", num: "01", name: "Surya Namaskar", category: "BODY" },
-  { id: "meditation", num: "02", name: "Meditation", category: "MIND" },
-  { id: "focus", num: "03", name: "Focus", category: "MIND" },
-  { id: "juice", num: "04", name: "Juice", category: "BODY" },
-  { id: "walk", num: "05", name: "Walk", category: "BODY" },
-  { id: "workout", num: "06", name: "Workout journaling", category: "WORK" },
-  { id: "yoga", num: "07", name: "Yoga", category: "BODY" },
-  { id: "earn", num: "08", name: "Earn money", category: "WORK" },
-  { id: "uncertainty", num: "09", name: "Accept uncertainty", category: "MIND" },
-  { id: "gym", num: "10", name: "Gym", category: "BODY" },
-  { id: "reading", num: "11", name: "Reading", category: "MIND" },
+  { id: "yoga", num: "02", name: "Yoga", category: "BODY" },
+  { id: "meditation", num: "03", name: "Meditation", category: "MIND" },
+  { id: "earn", num: "04", name: "Earn Money", category: "WORK" },
+  { id: "focus", num: "05", name: "Focus", category: "MIND" },
+  { id: "uncertainty", num: "06", name: "Uncertainty", category: "MIND" },
+  { id: "juice", num: "07", name: "Juice", category: "BODY" },
+  { id: "gym", num: "08", name: "Gym", category: "BODY" },
+  { id: "walk", num: "09", name: "Walk", category: "BODY" },
+  { id: "reading", num: "10", name: "Reading", category: "MIND" },
+  { id: "journaling", num: "11", name: "Journaling", category: "WORK" },
 ];
 
 const toISO = (d) => {
@@ -61,17 +61,29 @@ export default function DailyHabitsTab() {
   const currentEntry = habitsData[selectedDate] || { habits: {}, completedCount: 0 };
   const currentHabits = currentEntry.habits || {};
 
+  const isHabitChecked = (hId) => {
+    if (hId === "journaling") return !!(currentHabits.journaling || currentHabits.workout);
+    return !!currentHabits[hId];
+  };
+
   // Count for selected date
   const completedCount = useMemo(() => {
-    return HABIT_LIST.filter((h) => currentHabits[h.id]).length;
+    return HABIT_LIST.filter((h) => isHabitChecked(h.id)).length;
   }, [currentHabits]);
 
   const completionPct = Math.round((completedCount / HABIT_LIST.length) * 100);
 
   // Toggle habit checkbox
   const toggleHabit = (id) => {
-    const updated = { ...currentHabits, [id]: !currentHabits[id] };
-    const count = HABIT_LIST.filter((h) => updated[h.id]).length;
+    const isNowChecked = !isHabitChecked(id);
+    const updated = { ...currentHabits, [id]: isNowChecked };
+    if (id === "journaling") {
+      updated.workout = isNowChecked;
+    }
+    const count = HABIT_LIST.filter((h) => {
+      if (h.id === "journaling") return !!(updated.journaling || updated.workout);
+      return !!updated[h.id];
+    }).length;
 
     setHabitsData((prev) => ({
       ...prev,
@@ -162,8 +174,8 @@ export default function DailyHabitsTab() {
         className="glass-card"
         style={{
           padding: "24px 28px",
-          background: "linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.98))",
-          border: "1px solid rgba(16, 185, 129, 0.3)",
+          background: "linear-gradient(135deg, rgba(229, 184, 105, 0.06) 0%, rgba(13, 18, 29, 0.96) 100%)",
+          border: "1px solid var(--color-gold-border)",
           position: "relative",
           overflow: "hidden",
         }}
@@ -333,7 +345,7 @@ export default function DailyHabitsTab() {
             }}
           >
             {HABIT_LIST.map((habit) => {
-              const isChecked = !!currentHabits[habit.id];
+              const isChecked = isHabitChecked(habit.id);
               return (
                 <div
                   key={habit.id}

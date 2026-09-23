@@ -266,6 +266,61 @@ export async function removeHoldingFromDb(id) {
   return supabase.from('holdings').delete().eq('id', id);
 }
 
+// Reference catalog for Indian equities (instant offline & fallback quotes)
+export const STOCK_PRICE_CATALOG = {
+  BSE: 3270.70,
+  COALINDIA: 424.55,
+  "COAL INDIA": 424.55,
+  NSE: 1850.00,
+  MSCI: 7.00,
+  MSEI: 7.00,
+  RELIANCE: 1385.50,
+  HDFCBANK: 1682.00,
+  INFY: 1912.00,
+  TCS: 4125.00,
+  ITC: 492.00,
+  TATAMOTORS: 975.00,
+  SBIN: 815.00,
+  ICICIBANK: 1240.00,
+  BHARTIARTL: 1650.00,
+};
+
+/**
+ * Fetches the current market price (CMP) for an equity symbol.
+ * Checks serverless quote endpoint, falling back instantly to reference price catalog.
+ */
+export async function fetchStockQuote(rawSymbol) {
+  if (!rawSymbol) return null;
+  const clean = rawSymbol.trim().toUpperCase().replace(/\s+/g, '');
+
+  try {
+    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(clean)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.price != null && !isNaN(data.price)) {
+        return {
+          symbol: clean,
+          price: Number(data.price),
+          source: data.source || 'live',
+        };
+      }
+    }
+  } catch (err) {
+    // network or dev server without /api
+  }
+
+  const fallback = STOCK_PRICE_CATALOG[clean] || STOCK_PRICE_CATALOG[rawSymbol.trim().toUpperCase()];
+  if (fallback != null) {
+    return {
+      symbol: clean,
+      price: fallback,
+      source: 'catalog',
+    };
+  }
+
+  return null;
+}
+
 // Save settings
 export async function persistSettings(settings) {
   return supabase.from('settings').upsert({
