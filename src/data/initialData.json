@@ -1,0 +1,1583 @@
+{
+  "startingCapital": 975000,
+  "trades": [
+    {
+      "id": "838197aa-648f-49c6-b910-c448590bec22",
+      "date": "2026-06-04",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "18500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "2c23a14f-1960-4062-ba1a-c231c4857e67",
+      "date": "2026-06-05",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "5200",
+      "charges": "400",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "c2b427ce-bd3e-440f-8400-271c2b84b5bf",
+      "date": "2026-06-08",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "18000",
+      "charges": "600",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "ab356bfd-0246-4771-b689-b48496a387b4",
+      "date": "2026-06-09",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "22500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "56f3170c-bb39-45d2-9a9e-475745fe146c",
+      "date": "2026-06-10",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-18000",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "7681c847-e959-4486-90fb-0fdcbc04d5ad",
+      "date": "2026-06-11",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "31500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "0af881d2-4d14-461b-9612-ed7a944479e2",
+      "date": "2026-06-15",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "7300",
+      "charges": "300",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "0400a70d-00c5-43ad-8bb0-e8c3217d8207",
+      "date": "2026-06-16",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "12500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "dcfa0b27-75b0-49e8-9ea8-8db2df59e9dd",
+      "date": "2026-06-17",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "18500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "6eb027a8-d90d-4ac3-a421-d9ff946faccd",
+      "date": "2026-06-18",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "15500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "4f6822fb-4c9a-40a3-a01e-7a1e0ae151bd",
+      "date": "2026-06-19",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "2200",
+      "charges": "200",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "71163621-f5b9-41b5-a45f-4efa0a640c7b",
+      "date": "2026-06-22",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "12500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "36021a0c-ed36-4a72-b6ab-8fc05825047f",
+      "date": "2026-06-23",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "18500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "23d1ee8b-449c-4c17-b826-50e0f606235e",
+      "date": "2026-06-24",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-24500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "3259e596-7a45-4c01-bfef-b0cde6b0a36c",
+      "date": "2026-06-25",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "2200",
+      "charges": "200",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "f574c2c3-d74e-407e-bddd-5c430d3a9939",
+      "date": "2026-06-29",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "17500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "b9f4a6d4-bcc5-4519-95d1-c36e50841442",
+      "date": "2026-06-30",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "37000",
+      "charges": "1000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "4e50948d-3a86-49c8-8c7d-41f7b38a4d9c",
+      "date": "2026-07-01",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "9500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "a402b2cb-3951-4905-b477-38070d066afe",
+      "date": "2026-07-02",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "18500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "28c646e1-42af-4751-82ed-17943e17bc60",
+      "date": "2026-07-03",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "10500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "dbc3a501-0269-42ee-b375-ae01b6d14f6a",
+      "date": "2026-07-06",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "16500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "1fc578c1-7910-4d8e-be17-2fb7a6eca9c7",
+      "date": "2026-07-07",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "15500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "68c2c796-ef06-4c8d-b383-f7ea5a7bfa39",
+      "date": "2026-07-08",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-13000",
+      "charges": "1000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "4a39433e-daf0-4b8d-b4ab-9225494f9ed7",
+      "date": "2026-07-10",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "6500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "4a4aa04d-ff2b-4068-80df-3cf8bb1e0833",
+      "date": "2026-07-13",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "-55000",
+      "charges": "1000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": false,
+        "sizing": false,
+        "noRevenge": false,
+        "plan": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "afc2ffcb-be98-4945-b5a0-1c652014a2d8",
+      "date": "2026-07-14",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "-34000",
+      "charges": "1000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": false,
+        "sizing": false,
+        "noRevenge": false,
+        "plan": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "59350fa0-e208-4108-bb23-98e6ab8afd6e",
+      "date": "2026-07-15",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "6500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "648cec1a-f7a1-4e27-851a-75a96ed0c389",
+      "date": "2026-07-16",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "21500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "93e11093-af5f-49e8-a3f9-a0a1c5c8c186",
+      "date": "2026-07-17",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "-7500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "d3f7defd-f286-43fe-945c-a4fb693b0461",
+      "date": "2026-07-20",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "1100",
+      "charges": "100",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "39c0670e-9e69-4094-bede-1f89f3556648",
+      "date": "2026-07-21",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "22500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "f21e92dd-09a8-4f0e-96be-5d76c54468a5",
+      "date": "2026-07-22",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "1000",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "a363595e-c3cf-4093-865f-6035c2392881",
+      "date": "2026-07-23",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "11500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "7c7b67ed-fa18-421b-9cc7-3c1a32d54e3d",
+      "date": "2026-07-24",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "0",
+      "charges": "",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "1a0e8c61-1a7c-4675-95cb-3aa877bb2528",
+      "date": "2026-07-27",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "5500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "a7daf2b5-ee0d-42d0-8515-5826b585281a",
+      "date": "2026-07-28",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "26000",
+      "charges": "1000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "aba341a0-cdf3-4853-8d2f-6eac872dee01",
+      "date": "2026-07-29",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-6500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "f039a57d-33f2-40b1-a4e0-c21642518659",
+      "date": "2026-07-30",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-7500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "a40d6259-52a8-43af-b335-a8b0b51015a3",
+      "date": "2026-07-31",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "5500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "48b29e12-e41a-433b-a34e-9a6b290578d9",
+      "date": "2026-08-03",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "2200",
+      "charges": "200",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "9f9c7126-196c-449d-ab4a-e4e69ca75f0c",
+      "date": "2026-08-04",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "-4500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "3da65ea1-7a6d-4626-b0e5-2a4252704278",
+      "date": "2026-08-05",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "2200",
+      "charges": "200",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "6c16ea22-28fe-4139-a956-030c46e793ac",
+      "date": "2026-08-06",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-14500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "ab084d30-1d95-42dd-b783-b6582572c849",
+      "date": "2026-08-07",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "1500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "9f35cdd0-f484-4741-8b82-62366c398f55",
+      "date": "2026-08-10",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "18500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "02420b66-a46d-4ec4-b6bb-b18e1691e2a0",
+      "date": "2026-08-11",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "gross": "16500",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "4a37513d-2726-4e9a-87ca-707ddf33182a",
+      "date": "2026-08-12",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "-28000",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "34d7e149-3433-4b1f-861d-8d0d101edd3f",
+      "date": "2026-08-13",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "23000",
+      "charges": "500",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "d85d4d46-0c26-4cba-a3bd-e32505365962",
+      "date": "2026-07-09",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "gross": "19500",
+      "charges": "19000",
+      "capitalDeployed": "",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "1aa13537-f733-40ee-8f1d-6ab252048cad",
+      "date": "2026-08-14",
+      "index": "BANKNIFTY",
+      "strategy": "Strangle",
+      "bias": "Sideways",
+      "gross": "4050",
+      "charges": "150",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "04f5fcaf-fae4-4eac-b8f7-09eff6bc344f",
+      "date": "2026-08-17",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "8800",
+      "charges": "200",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "a0ab3597-a919-4700-8504-cb49aab6554f",
+      "date": "2026-08-18",
+      "index": "MIDCAP",
+      "strategy": "Straddle",
+      "bias": "Bearish",
+      "gross": "32500",
+      "charges": "500",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "0fc69031-adae-4e93-8f4a-ab3784806823",
+      "date": "2026-08-19",
+      "index": "BANKNIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "-250",
+      "charges": "50",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "66778392-0b2e-46cd-9de3-9a0be9219c8e",
+      "date": "2026-08-20",
+      "index": "MIDCAP",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "24100",
+      "charges": "300",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "d73cd0db-46e6-4c8b-a2de-3223bdc687b6",
+      "date": "2026-08-21",
+      "index": "MIDCAP",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "34400",
+      "charges": "100",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "017b70ca-75f6-42b9-a6cb-981f9f11897e",
+      "date": "2026-08-24",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "-33650",
+      "charges": "350",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": "midcap trade was taken on previous monday and closed today so overall made 56k in 1 week "
+    },
+    {
+      "id": "27dc1d88-2a47-4b9f-8782-07b5272de8b5",
+      "date": "2026-08-25",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "22800",
+      "charges": "300",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "c0b3ba12-1426-4657-bb32-06c34ed53a79",
+      "date": "2026-08-26",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "27500",
+      "charges": "500",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "446ba70c-fe38-4ef3-acf6-4b66ad6b6b16",
+      "date": "2026-08-27",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "-47000",
+      "charges": "500",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "fe9b9d7a-2a6b-42d6-9a7d-a99f5a752aea",
+      "date": "2026-08-28",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "1200",
+      "charges": "200",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "575792a7-c8fd-4bfb-96d8-0b1b7bfa8ac8",
+      "date": "2026-08-28",
+      "index": "STOCKS",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "15350",
+      "charges": "0150",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": "Tempsens IPO 50*300 & sold at 609 "
+    },
+    {
+      "id": "70c2bb20-919b-4229-914c-399ea1a17e5f",
+      "date": "2026-08-31",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "170",
+      "charges": "150",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "20f26854-544f-4765-a37b-d0f38af6b39b",
+      "date": "2026-09-01",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "10350",
+      "charges": "350",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "0f2f1a74-0aa9-43a8-bad3-9b911670253f",
+      "date": "2026-09-02",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "21850",
+      "charges": "350",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "53f08473-72d0-41ab-85e3-4b784e9fdb40",
+      "date": "2026-09-03",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "-27000",
+      "charges": "500",
+      "rules": {
+        "sl": false,
+        "sizing": false,
+        "noRevenge": false,
+        "plan": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "e441ed3c-3ece-4669-aca5-65ceeed9ec41",
+      "date": "2026-09-09",
+      "index": "BANKNIFTY",
+      "strategy": "Straddle",
+      "bias": "Bearish",
+      "gross": "76835",
+      "charges": "835",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "e090fadf-6891-41aa-9ba4-caa9fc328af4",
+      "date": "2026-09-10",
+      "index": "SENSEX",
+      "strategy": "Straddle",
+      "bias": "Bearish",
+      "gross": "9800",
+      "charges": "300",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "84e60ed2-a44e-49be-963b-60855d0f8e5e",
+      "date": "2026-09-11",
+      "index": "BANKNIFTY",
+      "strategy": "Straddle",
+      "bias": "Bullish",
+      "gross": "23000",
+      "charges": "500",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "041eab80-196b-453b-9af3-2802295c7204",
+      "date": "2026-09-15",
+      "index": "BANKNIFTY",
+      "strategy": "Straddle",
+      "bias": "Bearish",
+      "gross": "-166000",
+      "charges": "1000",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "39b6e09d-4bec-44f9-8d08-723f0f63e75d",
+      "date": "2026-09-08",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Sideways",
+      "gross": "-30000",
+      "charges": "600",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": "kunal & ashish "
+    },
+    {
+      "id": "9c0b06a8-fa41-41e5-a2c6-0247c85ed35f",
+      "date": "2026-09-16",
+      "index": "BANKNIFTY",
+      "strategy": "Bullish",
+      "bias": "Bullish",
+      "gross": "8300",
+      "charges": "300",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "8bb364ac-d6b3-41f8-9d55-cf2704358f88",
+      "date": "2026-09-17",
+      "index": "SENSEX",
+      "strategy": "Bearish",
+      "bias": "Sideways",
+      "gross": "-2000",
+      "charges": "300",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": "Market was showing strength for upside and not falling"
+    },
+    {
+      "id": "e4fc5c37-0d64-4d19-806a-0bde011a1624",
+      "date": "2026-09-21",
+      "index": "BANKNIFTY",
+      "strategy": "Strangle",
+      "bias": "Sideways",
+      "gross": "27295",
+      "charges": "295",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": "Friday & Monday 2 days overnight trade"
+    },
+    {
+      "id": "cde2167d-14f6-4b3d-a2fd-13939ce8d2d9",
+      "date": "2026-09-22",
+      "index": "NIFTY",
+      "strategy": "Straddle",
+      "bias": "Bearish",
+      "gross": "6700",
+      "charges": "700",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "e213e5b3-7261-43a9-8956-2d9019abed8b",
+      "date": "2026-09-23",
+      "index": "SENSEX",
+      "strategy": "Strangle",
+      "bias": "Sideways",
+      "gross": "15500",
+      "charges": "500",
+      "rules": {
+        "sl": true,
+        "sizing": true,
+        "noRevenge": true,
+        "plan": true
+      },
+      "notes": ""
+    }
+  ],
+  "ledger": [
+    {
+      "id": "fbd025f9-8385-4acf-99b7-5f760d7a7e4f",
+      "date": "2026-06-04",
+      "type": "Withdrawal",
+      "amount": "3000",
+      "note": "Daily profit"
+    },
+    {
+      "id": "559189db-f90d-4020-ab47-7dc4012e5221",
+      "date": "2026-06-05",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "cfe983c5-1192-4761-9fe3-07bdf0e57b6e",
+      "date": "2026-06-08",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "947c2b23-155d-41a5-b538-b8d3aeb394c8",
+      "date": "2026-06-09",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "5bdc8d0f-e7e4-4379-bd62-f11b3e72e7ce",
+      "date": "2026-06-10",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "63cffb89-6d87-44c0-a0db-21ca4a14d04b",
+      "date": "2026-06-11",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "1944c964-2dfe-419e-a374-25aabf9ae701",
+      "date": "2026-06-15",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "1be257fb-93aa-401a-ae5c-d09aceb16756",
+      "date": "2026-06-16",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "84d0b6d7-c46f-4e7e-b252-240befabc1bf",
+      "date": "2026-06-17",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "1c0bdbdf-e810-49ff-87a0-07343e928293",
+      "date": "2026-06-18",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "dfebcaa6-dc53-42df-981e-1fe831d1f00a",
+      "date": "2026-06-22",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "cd37daca-59af-4926-803b-50c8313a7ab4",
+      "date": "2026-06-23",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "930d206f-a28d-4198-9cbb-9c9fbeafb77e",
+      "date": "2026-06-24",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "4e58aa6a-78e1-4592-a51b-330e72fa6186",
+      "date": "2026-06-29",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "46482fdf-a406-43b4-b1cd-f3af05182cd8",
+      "date": "2026-06-30",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "fd1db544-b153-424d-8622-288110712de4",
+      "date": "2026-07-01",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "86c20712-96a2-4a09-b6fc-c8bd198b8af2",
+      "date": "2026-07-02",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "1ad5fdfe-c2f6-4793-8df1-6cc4897c5823",
+      "date": "2026-07-03",
+      "type": "Withdrawal",
+      "amount": "24000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "41d076fd-b0ed-4097-9ccc-6b28bf032045",
+      "date": "2026-07-07",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "a2328880-4d62-4f2f-97eb-d5afdc0eedcf",
+      "date": "2026-07-08",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "61024841-f4f4-4602-9b33-a07d4f1f768d",
+      "date": "2026-07-09",
+      "type": "Withdrawal",
+      "amount": "12000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "83048338-3e8a-4194-aa6e-c409d82f7ff0",
+      "date": "2026-07-10",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "057c954c-376c-4908-8944-9a727b70cd72",
+      "date": "2026-07-13",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "9ba7bdd7-e5ba-4b63-9a05-002ee14cb9be",
+      "date": "2026-07-14",
+      "type": "Withdrawal",
+      "amount": "6500",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "543fe8d8-9ad9-4971-98c3-f50d3342f97e",
+      "date": "2026-07-15",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "a364d74d-1916-46a2-b688-6e1d6b49e516",
+      "date": "2026-07-16",
+      "type": "Withdrawal",
+      "amount": "20000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "5e27674c-4dd1-49ae-a088-32e8e855d7da",
+      "date": "2026-07-20",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "86efbe90-2597-4d14-92fa-6fb8861e28ae",
+      "date": "2026-07-21",
+      "type": "Withdrawal",
+      "amount": "18000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "3df0c72f-687a-4509-82b7-7ac995daf271",
+      "date": "2026-07-22",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "e1d2161e-b542-4f92-86a0-c675a7d2f4a7",
+      "date": "2026-07-23",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "9d1698df-1312-443a-99b5-85a8f2834f0c",
+      "date": "2026-07-24",
+      "type": "Withdrawal",
+      "amount": "5500",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "6ed5964c-6e4a-4741-848d-149fe0640d8b",
+      "date": "2026-07-28",
+      "type": "Withdrawal",
+      "amount": "24000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "21aa86f3-cd3c-4e32-a7da-5c801213a9a7",
+      "date": "2026-08-03",
+      "type": "Withdrawal",
+      "amount": "5162",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "f1fdd6eb-4108-4c84-9ef1-f62d4e26eaf0",
+      "date": "2026-08-12",
+      "type": "Withdrawal",
+      "amount": "3000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "8b04ec11-4a8c-4fc9-9d2c-f32cf6e53f9a",
+      "date": "2026-08-13",
+      "type": "Withdrawal",
+      "amount": "30000",
+      "note": "Daily Profit"
+    },
+    {
+      "id": "606b767c-5893-4e09-898b-8cf7ab083f77",
+      "date": "2026-08-03",
+      "type": "Deposit",
+      "amount": "119000",
+      "note": "Capital IN"
+    },
+    {
+      "id": "9d6af917-8619-47a3-9de7-f8b55bbbc648",
+      "date": "2026-08-24",
+      "type": "Withdrawal",
+      "amount": "15000",
+      "note": ""
+    },
+    {
+      "id": "33d6765e-e7c9-4d05-86ed-71bbf53287ff",
+      "date": "2026-08-25",
+      "type": "Withdrawal",
+      "amount": "15000",
+      "note": ""
+    },
+    {
+      "id": "0190d9b4-e20a-41e1-8a67-93290df0b12b",
+      "date": "2026-08-27",
+      "type": "Withdrawal",
+      "amount": "45000",
+      "note": "IPO"
+    },
+    {
+      "id": "46d22f8a-2850-4b8e-a020-6a8c885eef68",
+      "date": "2026-08-28",
+      "type": "Withdrawal",
+      "amount": "15350",
+      "note": "from kotak tempsen IPO"
+    },
+    {
+      "id": "7fa07878-fe62-481e-97ed-6a7d7ad89fbd",
+      "date": "2026-08-31",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily"
+    },
+    {
+      "id": "dc7fbbbf-db26-40d4-a324-983549356f34",
+      "date": "2026-09-01",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": "Daily"
+    },
+    {
+      "id": "be1f25c7-a51c-4892-a4b6-a8c26aa4335a",
+      "date": "2026-09-02",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": ""
+    },
+    {
+      "id": "6fd1876f-3589-49ce-b069-ebcbda0ecb02",
+      "date": "2026-09-03",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": ""
+    },
+    {
+      "id": "3fdb433c-040d-4f64-b9ac-017451cef7cc",
+      "date": "2026-09-08",
+      "type": "Deposit",
+      "amount": "27000",
+      "note": "credit card and paid to Ashish bhai"
+    },
+    {
+      "id": "c22c73a8-ce13-4a2a-b03c-fc04dc97496e",
+      "date": "2026-09-09",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": ""
+    },
+    {
+      "id": "523f0ceb-3b27-419f-aa89-5c5c05b9fd81",
+      "date": "2026-09-10",
+      "type": "Withdrawal",
+      "amount": "15000",
+      "note": ""
+    },
+    {
+      "id": "ec326a3a-dc74-412e-9d10-fffdb0de822c",
+      "date": "2026-09-15",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": ""
+    },
+    {
+      "id": "da54bca8-f96c-44a3-8529-fb52a1fb889b",
+      "date": "2026-09-16",
+      "type": "Withdrawal",
+      "amount": "6000",
+      "note": ""
+    },
+    {
+      "id": "d13975a7-62a7-4cad-9bb7-0247c204f2db",
+      "date": "2026-09-17",
+      "type": "Withdrawal",
+      "amount": "42000",
+      "note": ""
+    },
+    {
+      "id": "314fead9-03b3-40b1-837f-4d0d6e24eca8",
+      "date": "2026-09-23",
+      "type": "Withdrawal",
+      "amount": "10000",
+      "note": "Metropoltion stock buy"
+    }
+  ],
+  "holdings": [
+    {
+      "id": "503f7302-9947-4392-9020-a17407ef94e2",
+      "date": "2026-08-11",
+      "stock": "BSE",
+      "qty": "3",
+      "buyPrice": "3573",
+      "currentPrice": "3306"
+    },
+    {
+      "id": "8f65a0b7-9d20-4ab8-944f-e484b7e9d149",
+      "date": "2026-09-04",
+      "stock": "Coal India",
+      "qty": "1",
+      "buyPrice": "414",
+      "currentPrice": ""
+    }
+  ],
+  "exportedAt": "2026-09-23T11:15:52.836Z"
+}
