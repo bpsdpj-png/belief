@@ -28,6 +28,13 @@ import {
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
 import { BHARAT_ACTIVITIES, getBharatActivityById } from "../data/bharatAvatar";
+import {
+  playMeditationChime,
+  playCricketShotSound,
+  playPushupRepSound,
+  playGlassClinkSound,
+  playProfitFanfare,
+} from "../utils/avatarAudio";
 import "../styles/dashboard.css";
 
 const RULE_DEFS = [
@@ -1606,10 +1613,10 @@ export default function Dashboard() {
       {showAvatarModal && (
         <ModalWrapper onClose={() => { setShowAvatarModal(false); setAvatarPreviewMode(null); }} title="Bharat's Life & Mindset Companion">
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "10px 0" }}>
-            {/* Full-Body Avatar Artwork Frame */}
+            {/* Full-Body Avatar Artwork Frame with Kinetic Motion */}
             <div style={{
-              width: 240,
-              height: 320,
+              width: 250,
+              height: 330,
               borderRadius: 16,
               overflow: "hidden",
               border: `3px solid ${currentBharatActivity.accentColor}`,
@@ -1618,11 +1625,60 @@ export default function Dashboard() {
               background: "var(--bg-card)",
               position: "relative",
             }}>
-              <img
-                src={currentBharatActivity.image}
-                alt={`Bharat - ${currentBharatActivity.name}`}
-                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
-              />
+              {/* Kinetic Motion Animated Character */}
+              <div style={{
+                width: "100%",
+                height: "100%",
+                animation: currentBharatActivity.id === "workout"
+                  ? "avatarPushupMotion 2.4s ease-in-out infinite"
+                  : currentBharatActivity.id === "meditation"
+                  ? "avatarLevitate 3.8s ease-in-out infinite"
+                  : currentBharatActivity.id === "cricket"
+                  ? "avatarCricketTap 3.4s ease-in-out infinite"
+                  : "avatarLevitate 4.5s ease-in-out infinite",
+                transformOrigin: "center center",
+              }}>
+                <img
+                  src={currentBharatActivity.image}
+                  alt={`Bharat - ${currentBharatActivity.name}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
+                />
+              </div>
+
+              {/* Pulsing Live Action Indicator Badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  background: "rgba(15, 23, 42, 0.85)",
+                  backdropFilter: "blur(8px)",
+                  border: `1px solid ${currentBharatActivity.accentColor}60`,
+                  padding: "3px 9px",
+                  borderRadius: 20,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  color: "#FFFFFF",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: currentBharatActivity.accentColor,
+                    display: "inline-block",
+                    animation: "avatarLiveDotPulse 1.4s ease-in-out infinite",
+                  }}
+                />
+                Live Action
+              </div>
             </div>
 
             {/* Persona Badge */}
@@ -1644,6 +1700,49 @@ export default function Dashboard() {
               <span>{currentBharatActivity.emoji}</span>
               <span>{currentBharatActivity.name}</span>
             </div>
+
+            {/* Live Interactive Action Trigger Button */}
+            <button
+              onClick={() => {
+                if (currentBharatActivity.id === "workout") playPushupRepSound(1);
+                else if (currentBharatActivity.id === "meditation") playMeditationChime();
+                else if (currentBharatActivity.id === "cricket") playCricketShotSound();
+                else if (currentBharatActivity.id === "romance") playGlassClinkSound();
+                else if (currentBharatActivity.id === "profit") playProfitFanfare();
+                else playPushupRepSound(2);
+              }}
+              style={{
+                width: "100%",
+                maxWidth: 480,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: `1px solid ${currentBharatActivity.accentColor}`,
+                background: `linear-gradient(135deg, ${currentBharatActivity.accentColor}25 0%, var(--bg-elevated) 100%)`,
+                color: "var(--text-main)",
+                fontSize: 12.5,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                marginBottom: 12,
+                boxShadow: `0 2px 10px ${currentBharatActivity.glowColor}`,
+              }}
+            >
+              <Sparkles size={14} color={currentBharatActivity.accentColor} />
+              {currentBharatActivity.id === "workout"
+                ? "⚡ Count Pushup Rep (+ Audio FX)"
+                : currentBharatActivity.id === "meditation"
+                ? "🔔 Strike 528 Hz Singing Bowl Chime"
+                : currentBharatActivity.id === "cricket"
+                ? "🏏 Strike Cover Drive (Wood Crack FX)"
+                : currentBharatActivity.id === "romance"
+                ? "🥂 Toast & Clink Wine Glasses"
+                : currentBharatActivity.id === "profit"
+                ? "🎉 Play ₹20Cr Victory Fanfare"
+                : "⚡ Focus & Poise Mind"}
+            </button>
 
             {/* Avatar Quote */}
             <div style={{
