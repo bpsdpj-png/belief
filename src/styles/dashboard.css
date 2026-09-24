@@ -98,19 +98,34 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg-main);
+  background-color: var(--bg-main);
+  background-image: 
+    radial-gradient(1200px circle at 50% -12%, rgba(229, 184, 105, 0.07), transparent 60%),
+    radial-gradient(800px circle at 92% 35%, rgba(16, 185, 129, 0.035), transparent 50%),
+    radial-gradient(800px circle at 8% 65%, rgba(244, 63, 94, 0.025), transparent 50%);
+  background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
   font-family: var(--font-sans);
   letter-spacing: 0.015em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme="light"] html,
+[data-theme="light"] body {
+  background-color: #F8FAFC;
+  background-image: 
+    radial-gradient(1200px circle at 50% -10%, rgba(217, 119, 6, 0.06), transparent 65%),
+    radial-gradient(850px circle at 90% 25%, rgba(5, 150, 105, 0.035), transparent 50%),
+    radial-gradient(800px circle at 10% 70%, rgba(220, 38, 38, 0.025), transparent 50%);
+  background-attachment: fixed;
 }
 
 #root {
   min-height: 100vh;
-  background: var(--bg-main);
+  background: transparent;
   color: var(--text-main);
 }
 
@@ -202,28 +217,159 @@ button:active {
   transform: scale(0.98);
 }
 
-/* Glass Card */
+/* Glass Card - High Jewelry Chamfered Crystal Finish */
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 30px -4px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 [data-theme="light"] .glass-card {
   background: #FFFFFF;
   border: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 6px 20px -4px rgba(15, 23, 42, 0.05);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
 .glass-card:hover {
   border-color: var(--border-card-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 36px -6px rgba(0, 0, 0, 0.55);
 }
 
 [data-theme="light"] .glass-card:hover {
   border-color: rgba(217, 119, 6, 0.35);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04), 0 14px 32px -4px rgba(217, 119, 6, 0.1);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 12px rgba(15, 23, 42, 0.04), 0 14px 32px -4px rgba(217, 119, 6, 0.1);
+}
+
+/* Luxury Metric Cards */
+.luxury-metric-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.luxury-metric-card:hover {
+  transform: translateY(-2px);
+}
+
+.luxury-metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-gold), transparent 75%);
+  opacity: 0.85;
+}
+
+.luxury-metric-card.pnl-win::before {
+  background: linear-gradient(90deg, var(--color-win), transparent 75%);
+}
+
+.luxury-metric-card.pnl-loss::before {
+  background: linear-gradient(90deg, var(--color-loss), transparent 75%);
+}
+
+.luxury-icon-medallion {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 30%, rgba(229, 184, 105, 0.2), rgba(229, 184, 105, 0.05));
+  border: 1px solid var(--color-gold-border);
+  color: var(--color-gold);
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] .luxury-icon-medallion {
+  background: radial-gradient(circle at 30% 30%, rgba(217, 119, 6, 0.14), rgba(217, 119, 6, 0.04));
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #B45309;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.luxury-icon-medallion.win {
+  background: radial-gradient(circle at 30% 30%, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.05));
+  border-color: var(--color-win-border);
+  color: var(--color-win-text);
+}
+
+[data-theme="light"] .luxury-icon-medallion.win {
+  background: radial-gradient(circle at 30% 30%, rgba(5, 150, 105, 0.14), rgba(5, 150, 105, 0.04));
+  border-color: rgba(5, 150, 105, 0.28);
+  color: #059669;
+}
+
+.luxury-icon-medallion.loss {
+  background: radial-gradient(circle at 30% 30%, rgba(244, 63, 94, 0.22), rgba(244, 63, 94, 0.05));
+  border-color: var(--color-loss-border);
+  color: var(--color-loss-text);
+}
+
+[data-theme="light"] .luxury-icon-medallion.loss {
+  background: radial-gradient(circle at 30% 30%, rgba(220, 38, 38, 0.14), rgba(220, 38, 38, 0.04));
+  border-color: rgba(220, 38, 38, 0.28);
+  color: #DC2626;
+}
+
+/* Weekday Session Breakdown Cards */
+.weekday-card {
+  padding: 14px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="light"] .weekday-card {
+  background: #F8FAFC;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.weekday-card.is-today {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 16px var(--color-gold-soft);
+}
+
+[data-theme="light"] .weekday-card.is-today {
+  border-color: #D97706;
+  background: #FFFDF9;
+  box-shadow: 0 2px 12px rgba(217, 119, 6, 0.12);
+}
+
+.weekday-card.is-win {
+  border-left: 3px solid var(--color-win);
+}
+
+.weekday-card.is-loss {
+  border-left: 3px solid var(--color-loss);
+}
+
+.weekday-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-card-hover);
+}
+
+[data-theme="light"] .weekday-card:hover {
+  border-color: rgba(217, 119, 6, 0.35);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
 /* Tab Pills */

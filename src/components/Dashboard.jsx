@@ -7,7 +7,8 @@ import {
   Plus, TrendingUp, TrendingDown, IndianRupee, Target, ShieldCheck, X, Trash2,
   Wallet, PiggyBank, ArrowDownToLine, Flame, Briefcase, Percent, Download, Pencil,
   Database, RefreshCw, Sun, Moon, Search, Filter, CheckCircle2, ChevronRight,
-  ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Layers
+  ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Layers,
+  Calendar, ChevronLeft, Award, Sparkles, Clock
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -1327,7 +1328,7 @@ export default function Dashboard() {
 
         {/* Tab Contents */}
         {tab === "overview" && (
-          <OverviewTab stats={stats} targetPct={targetPct} setTargetPct={setTargetPct} />
+          <OverviewTab stats={stats} targetPct={targetPct} setTargetPct={setTargetPct} trades={tradesSorted} />
         )}
 
         {tab === "trades" && (
@@ -2215,21 +2216,45 @@ export default function Dashboard() {
   );
 }
 
-// Top Metric Card Component
-function MetricSummaryCard({ label, value, icon, isPnl, val, customColor }) {
+// Top Metric Card Component - Luxury Horology Finishes
+function MetricSummaryCard({ label, value, icon, isPnl, val, customColor, subtext }) {
   let color = customColor || "var(--text-main)";
+  let pnlClass = "";
+  let medallionVariant = "";
+
   if (isPnl) {
-    color = val >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)";
+    if (val > 0) {
+      color = "var(--color-win-text)";
+      pnlClass = "pnl-win";
+      medallionVariant = "win";
+    } else if (val < 0) {
+      color = "var(--color-loss-text)";
+      pnlClass = "pnl-loss";
+      medallionVariant = "loss";
+    }
+  } else if (customColor) {
+    if (customColor.includes("win")) medallionVariant = "win";
+    else if (customColor.includes("loss")) medallionVariant = "loss";
   }
+
   return (
-    <div className="glass-card" style={{ padding: "14px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {label}
-        </span>
-        <div style={{ color: "var(--color-gold)", opacity: 0.85 }}>{icon}</div>
+    <div className={`glass-card luxury-metric-card ${pnlClass}`}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {label}
+          </span>
+          {subtext && (
+            <span style={{ fontSize: 10, color: "var(--text-secondary)", opacity: 0.8 }}>
+              {subtext}
+            </span>
+          )}
+        </div>
+        <div className={`luxury-icon-medallion ${medallionVariant}`}>
+          {icon}
+        </div>
       </div>
-      <div className="mono" style={{ fontSize: 20, fontWeight: 700, color }}>
+      <div className="mono" style={{ fontSize: 21, fontWeight: 800, color, letterSpacing: "-0.01em" }}>
         {value}
       </div>
     </div>
@@ -2262,8 +2287,577 @@ function ModalWrapper({ children, onClose, title, subtitle }) {
   );
 }
 
+// Weekly Profit & Loss Review (Monday to Friday) Component
+function WeeklyPnLReview({ trades }) {
+  const [viewMode, setViewMode] = useState("week"); // "week" | "allTime"
+
+  const getMondayIso = (dateOrIso) => {
+    const d = typeof dateOrIso === "string" ? new Date(dateOrIso + "T00:00:00") : new Date(dateOrIso);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return toLocalISODate(d);
+  };
+
+  const shiftIsoDate = (isoMonday, dayOffset) => {
+    const d = new Date(isoMonday + "T00:00:00");
+    d.setDate(d.getDate() + dayOffset);
+    return toLocalISODate(d);
+  };
+
+  const fmtDayMonth = (iso) => {
+    if (!iso) return "—";
+    const parts = iso.split("-");
+    if (parts.length !== 3) return iso;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const mIdx = parseInt(parts[1], 10) - 1;
+    return `${parseInt(parts[2], 10)} ${months[mIdx] || parts[1]}`;
+  };
+
+  const latestTradeDate = useMemo(() => {
+    if (!trades || trades.length === 0) return todayLocalISO();
+    return trades[trades.length - 1].date;
+  }, [trades]);
+
+  const defaultMonday = useMemo(() => getMondayIso(latestTradeDate), [latestTradeDate]);
+  const [selectedMonday, setSelectedMonday] = useState(defaultMonday);
+
+  useEffect(() => {
+    setSelectedMonday(defaultMonday);
+  }, [defaultMonday]);
+
+  // Compute 5 Monday to Friday days for selectedMonday
+  const weekData = useMemo(() => {
+    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const shortNames = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+    const days = [];
+    let weekNet = 0;
+    let weekGross = 0;
+    let weekCharges = 0;
+    let weekTradeCount = 0;
+    let winDays = 0;
+    let lossDays = 0;
+    let bestDayNet = -Infinity;
+    let bestDayName = null;
+
+    for (let i = 0; i < 5; i++) {
+      const dayDate = shiftIsoDate(selectedMonday, i);
+      const dayTrades = (trades || []).filter(t => t.date === dayDate);
+      
+      const count = dayTrades.length;
+      const gross = dayTrades.reduce((sum, t) => sum + (Number(t.gross) || 0), 0);
+      const charges = dayTrades.reduce((sum, t) => sum + (Number(t.charges) || 0), 0);
+      const net = gross - charges;
+      const indices = Array.from(new Set(dayTrades.map(t => t.index).filter(Boolean)));
+      const hasTrades = count > 0;
+      const isWin = hasTrades && net > 0;
+      const isLoss = hasTrades && net < 0;
+
+      if (hasTrades) {
+        weekNet += net;
+        weekGross += gross;
+        weekCharges += charges;
+        weekTradeCount += count;
+        if (net > 0) winDays++;
+        else if (net < 0) lossDays++;
+
+        if (net > bestDayNet) {
+          bestDayNet = net;
+          bestDayName = shortNames[i];
+        }
+      }
+
+      days.push({
+        dayIndex: i,
+        name: dayNames[i],
+        shortName: shortNames[i],
+        date: dayDate,
+        displayDate: fmtDayMonth(dayDate),
+        hasTrades,
+        count,
+        gross,
+        charges,
+        net,
+        isWin,
+        isLoss,
+        indices,
+        isToday: dayDate === todayLocalISO()
+      });
+    }
+
+    const tradedDaysCount = winDays + lossDays;
+    const winRate = tradedDaysCount > 0 ? (winDays / tradedDaysCount) * 100 : 0;
+
+    return {
+      mondayIso: selectedMonday,
+      fridayIso: shiftIsoDate(selectedMonday, 4),
+      days,
+      weekNet,
+      weekGross,
+      weekCharges,
+      weekTradeCount,
+      winDays,
+      lossDays,
+      tradedDaysCount,
+      winRate,
+      bestDayName: bestDayNet > -Infinity ? bestDayName : null,
+      bestDayNet: bestDayNet > -Infinity ? bestDayNet : 0
+    };
+  }, [selectedMonday, trades]);
+
+  const goPrev = () => setSelectedMonday(prev => shiftIsoDate(prev, -7));
+  const goNext = () => setSelectedMonday(prev => shiftIsoDate(prev, 7));
+  const goLatest = () => setSelectedMonday(defaultMonday);
+
+  // All-time weekday edge statistics (Mon to Fri)
+  const allTimeWeekdayStats = useMemo(() => {
+    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const shortNames = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    const expiryLabels = ["Midcap Expiry", "FinNifty Expiry", "BankNifty Expiry", "Nifty Expiry", "Sensex Expiry"];
+
+    const buckets = [0, 1, 2, 3, 4].map(idx => ({
+      dayIndex: idx,
+      name: dayNames[idx],
+      shortName: shortNames[idx],
+      expiryTag: expiryLabels[idx],
+      totalNet: 0,
+      totalGross: 0,
+      totalCharges: 0,
+      tradeCount: 0,
+      sessions: new Map(),
+    }));
+
+    (trades || []).forEach(t => {
+      const d = new Date(t.date + "T00:00:00");
+      const dow = d.getDay();
+      if (dow >= 1 && dow <= 5) {
+        const bucket = buckets[dow - 1];
+        const gross = Number(t.gross) || 0;
+        const charges = Number(t.charges) || 0;
+        const net = gross - charges;
+
+        bucket.totalGross += gross;
+        bucket.totalCharges += charges;
+        bucket.totalNet += net;
+        bucket.tradeCount += 1;
+
+        const prevSessionNet = bucket.sessions.get(t.date) || 0;
+        bucket.sessions.set(t.date, prevSessionNet + net);
+      }
+    });
+
+    return buckets.map(b => {
+      const sessionCount = b.sessions.size;
+      let winSessions = 0;
+      let lossSessions = 0;
+      b.sessions.forEach(net => {
+        if (net > 0) winSessions++;
+        else if (net < 0) lossSessions++;
+      });
+      const winRate = sessionCount > 0 ? (winSessions / sessionCount) * 100 : 0;
+      const avgNet = sessionCount > 0 ? b.totalNet / sessionCount : 0;
+
+      return {
+        ...b,
+        sessionCount,
+        winSessions,
+        lossSessions,
+        winRate,
+        avgNet,
+      };
+    });
+  }, [trades]);
+
+  return (
+    <div className="glass-card" style={{ padding: 22 }}>
+      {/* Header Bar: Title, Week Navigator, Mode Selector */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14, marginBottom: 18, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 16 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-main)" }}>
+              Weekly Profit & Loss Review
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+              background: "var(--color-gold-soft)", color: "var(--color-gold)", border: "1px solid var(--color-gold-border)",
+              textTransform: "uppercase", letterSpacing: "0.05em"
+            }}>
+              Mon – Fri Sessions
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+            {viewMode === "week"
+              ? `Trading window: ${fmtDayMonth(weekData.mondayIso)} – ${fmtDayMonth(weekData.fridayIso)}, ${weekData.mondayIso.slice(0, 4)}`
+              : "All-time weekday edge & statistical distribution"}
+          </div>
+        </div>
+
+        {/* View Mode Switcher & Navigation Controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* Mode Switcher */}
+          <div style={{ display: "flex", background: "var(--bg-elevated)", padding: 3, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+            <button
+              onClick={() => setViewMode("week")}
+              style={{
+                padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, border: "none", cursor: "pointer",
+                background: viewMode === "week" ? "var(--bg-card)" : "transparent",
+                color: viewMode === "week" ? "var(--text-main)" : "var(--text-muted)",
+                boxShadow: viewMode === "week" ? "0 1px 4px rgba(0,0,0,0.15)" : "none"
+              }}
+            >
+              Selected Week
+            </button>
+            <button
+              onClick={() => setViewMode("allTime")}
+              style={{
+                padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, border: "none", cursor: "pointer",
+                background: viewMode === "allTime" ? "var(--bg-card)" : "transparent",
+                color: viewMode === "allTime" ? "var(--text-main)" : "var(--text-muted)",
+                boxShadow: viewMode === "allTime" ? "0 1px 4px rgba(0,0,0,0.15)" : "none"
+              }}
+            >
+              All-Time Weekdays
+            </button>
+          </div>
+
+          {/* Week Stepper (Only active in "week" mode) */}
+          {viewMode === "week" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                onClick={goPrev}
+                title="Previous Week"
+                className="btn-secondary"
+                style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+              >
+                <ChevronLeft size={14} />
+                <span className="desktop-only">Prev</span>
+              </button>
+
+              <button
+                onClick={goLatest}
+                title="Jump to Latest Week"
+                className="btn-secondary"
+                style={{
+                  padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  color: selectedMonday === defaultMonday ? "var(--color-gold)" : "var(--text-muted)",
+                  borderColor: selectedMonday === defaultMonday ? "var(--color-gold-border)" : "var(--border-subtle)"
+                }}
+              >
+                Latest
+              </button>
+
+              <button
+                onClick={goNext}
+                title="Next Week"
+                className="btn-secondary"
+                style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+              >
+                <span className="desktop-only">Next</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {viewMode === "week" ? (
+        <>
+          {/* Week KPI Ribbons */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 18 }}>
+            <div style={{ background: "var(--bg-elevated)", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>
+                Week Net P&L
+              </div>
+              <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: weekData.weekNet >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                {fmtSigned(weekData.weekNet)}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bg-elevated)", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>
+                Day Win Rate
+              </div>
+              <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: weekData.winRate >= 50 ? "var(--color-win-text)" : (weekData.tradedDaysCount === 0 ? "var(--text-muted)" : "var(--color-loss-text)") }}>
+                {weekData.tradedDaysCount > 0 ? `${weekData.winRate.toFixed(0)}% (${weekData.winDays}W / ${weekData.lossDays}L)` : "No trades"}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bg-elevated)", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>
+                Trades Logged
+              </div>
+              <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: "var(--text-main)" }}>
+                {weekData.weekTradeCount} trade{weekData.weekTradeCount === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bg-elevated)", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>
+                Best Day
+              </div>
+              <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: weekData.bestDayNet > 0 ? "var(--color-win-text)" : "var(--text-muted)" }}>
+                {weekData.bestDayName ? `${weekData.bestDayName} (${fmtSigned(weekData.bestDayNet)})` : "—"}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bg-elevated)", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>
+                Gross / Brokerage
+              </div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
+                {fmtINR(weekData.weekGross)} <span style={{ color: "var(--text-muted)", fontSize: 11 }}>/ -{fmtINR(weekData.weekCharges)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Monday to Friday Bar Chart */}
+          <div style={{ width: "100%", height: 210, marginBottom: 20 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weekData.days} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid stroke="var(--chart-grid)" vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="shortName"
+                  tick={{ fill: "var(--chart-axis)", fontSize: 11, fontWeight: 600 }}
+                  axisLine={{ stroke: "var(--border-subtle)" }}
+                  tickLine={false}
+                  tickFormatter={(val, i) => `${val} (${weekData.days[i]?.displayDate || ""})`}
+                />
+                <YAxis
+                  tick={{ fill: "var(--chart-axis)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`}
+                  width={50}
+                />
+                <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1.5} />
+                <Tooltip
+                  cursor={{ fill: "rgba(229, 184, 105, 0.05)" }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const d = payload[0].payload;
+                    return (
+                      <div style={{
+                        background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)",
+                        borderRadius: 10, padding: "10px 14px", fontSize: 12, minWidth: 170,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+                      }}>
+                        <div style={{ fontWeight: 700, color: "var(--text-main)", marginBottom: 4 }}>
+                          {d.name}, {d.displayDate}
+                        </div>
+                        {d.hasTrades ? (
+                          <>
+                            <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: d.net >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginBottom: 6 }}>
+                              Net: {fmtSigned(d.net)}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                              <span>Gross:</span>
+                              <span className="mono" style={{ color: "var(--text-main)" }}>{fmtINR(d.gross)}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                              <span>Brokerage:</span>
+                              <span className="mono" style={{ color: "var(--color-loss-text)" }}>-{fmtINR(d.charges)}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                              <span>Trades:</span>
+                              <span className="mono" style={{ color: "var(--text-main)" }}>{d.count} ({d.indices.join(", ")})</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: 11.5 }}>
+                            No trades logged on this session
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="net" radius={[6, 6, 6, 6]}>
+                  {weekData.days.map((d, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={!d.hasTrades ? "rgba(148, 163, 184, 0.15)" : d.net >= 0 ? "var(--color-win)" : "var(--color-loss)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 5 Monday to Friday Session Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            {weekData.days.map((d) => (
+              <div
+                key={d.dayIndex}
+                className={`weekday-card ${d.isToday ? "is-today" : ""} ${d.isWin ? "is-win" : ""} ${d.isLoss ? "is-loss" : ""}`}
+              >
+                {/* Day Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-main)", letterSpacing: "0.04em" }}>
+                      {d.shortName}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
+                      {d.displayDate}
+                    </div>
+                  </div>
+
+                  {/* Status Pill */}
+                  {d.hasTrades ? (
+                    <span style={{
+                      fontSize: 9.5, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: d.net >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                      color: d.net >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
+                      border: `1px solid ${d.net >= 0 ? "var(--color-win-border)" : "var(--color-loss-border)"}`
+                    }}>
+                      {d.net >= 0 ? "PROFIT" : "DRAWDOWN"}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 9.5, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "rgba(148, 163, 184, 0.1)", color: "var(--text-muted)" }}>
+                      OFF
+                    </span>
+                  )}
+                </div>
+
+                {/* Day P&L */}
+                <div>
+                  <div className="mono" style={{ fontSize: 17, fontWeight: 700, color: !d.hasTrades ? "var(--text-muted)" : d.net >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                    {d.hasTrades ? fmtSigned(d.net) : "—"}
+                  </div>
+                  {d.hasTrades && (
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                      {d.count} trade{d.count === 1 ? "" : "s"} · charges: {fmtINR(d.charges)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Indices traded tag */}
+                {d.hasTrades && d.indices.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                    {d.indices.map(idx => (
+                      <span key={idx} style={{
+                        fontSize: 9, padding: "1px 5px", borderRadius: 3,
+                        background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)",
+                        border: "1px solid var(--border-subtle)"
+                      }}>
+                        {idx}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        /* All-Time Weekdays View */
+        <>
+          <div style={{ width: "100%", height: 210, marginBottom: 20 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={allTimeWeekdayStats} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid stroke="var(--chart-grid)" vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="shortName" tick={{ fill: "var(--chart-axis)", fontSize: 11, fontWeight: 600 }} axisLine={{ stroke: "var(--border-subtle)" }} tickLine={false} />
+                <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} width={50} />
+                <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1.5} />
+                <Tooltip
+                  cursor={{ fill: "rgba(229, 184, 105, 0.05)" }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const d = payload[0].payload;
+                    return (
+                      <div style={{
+                        background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)",
+                        borderRadius: 10, padding: "10px 14px", fontSize: 12, minWidth: 180,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+                      }}>
+                        <div style={{ fontWeight: 700, color: "var(--text-main)", marginBottom: 4 }}>
+                          All-Time {d.name}s
+                        </div>
+                        <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: d.totalNet >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginBottom: 6 }}>
+                          Total Net: {fmtSigned(d.totalNet)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                          <span>Win Rate:</span>
+                          <span className="mono" style={{ color: "var(--text-main)", fontWeight: 600 }}>{d.winRate.toFixed(1)}%</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                          <span>Avg P&L / Session:</span>
+                          <span className="mono" style={{ color: d.avgNet >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>{fmtSigned(d.avgNet)}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                          <span>Sessions Traded:</span>
+                          <span className="mono" style={{ color: "var(--text-main)" }}>{d.sessionCount} ({d.winSessions}W / {d.lossSessions}L)</span>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "var(--color-gold)", marginTop: 6, fontStyle: "italic" }}>
+                          Key: {d.expiryTag}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="totalNet" radius={[6, 6, 6, 6]}>
+                  {allTimeWeekdayStats.map((d, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={d.totalNet >= 0 ? "var(--color-win)" : "var(--color-loss)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 5 All-Time Weekday Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            {allTimeWeekdayStats.map((d) => (
+              <div
+                key={d.dayIndex}
+                className="weekday-card"
+                style={{
+                  borderLeft: `3px solid ${d.totalNet >= 0 ? "var(--color-win)" : "var(--color-loss)"}`
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-main)" }}>
+                      {d.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--color-gold)", fontWeight: 600 }}>
+                      {d.expiryTag}
+                    </div>
+                  </div>
+                  <span className="mono" style={{
+                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                    background: d.winRate >= 50 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                    color: d.winRate >= 50 ? "var(--color-win-text)" : "var(--color-loss-text)"
+                  }}>
+                    {d.winRate.toFixed(0)}% WIN
+                  </span>
+                </div>
+
+                <div>
+                  <div className="mono" style={{ fontSize: 17, fontWeight: 700, color: d.totalNet >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                    {fmtSigned(d.totalNet)}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 2 }}>
+                    Avg: {fmtSigned(d.avgNet)} · {d.sessionCount} sessions
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>
+                  {d.winSessions} wins · {d.lossSessions} losses ({d.tradeCount} trades)
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Overview Tab Component
-function OverviewTab({ stats, targetPct, setTargetPct }) {
+function OverviewTab({ stats, targetPct, setTargetPct, trades }) {
   const dailyTarget = stats.currentCapital * (targetPct / 100);
   const stopLossLow = dailyTarget * 1;
   const stopLossHigh = dailyTarget * 1.5;
@@ -2332,6 +2926,9 @@ function OverviewTab({ stats, targetPct, setTargetPct }) {
           <DisciplineRing value={stats.discipline} />
         </div>
       </div>
+
+      {/* Weekly Profit & Loss Review (Monday to Friday) */}
+      <WeeklyPnLReview trades={trades} />
 
       {/* Row 2: Target/Stoploss & Capital Health */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
