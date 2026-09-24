@@ -41,10 +41,7 @@ export function mapLedgerFromDb(row) {
   return {
     id: row.id,
     date: row.date,
-    type: row.type,
-    withdrawalUse: row.withdrawal_use || (row.type === 'Investment' ? 'stock' : 'cash'),
-    stockSymbol: row.stock_symbol || '',
-    holdingId: row.holding_id || null,
+    type: row.type || 'Deposit',
     amount: row.amount !== null && row.amount !== undefined ? String(row.amount) : '',
     note: row.note || '',
     metadata: row.metadata || {},
@@ -56,10 +53,10 @@ export function mapLedgerToDb(entry) {
   return {
     id: entry.id,
     date: entry.date,
-    type: entry.type,
-    withdrawal_use: entry.withdrawalUse || (entry.type === 'Investment' ? 'stock' : 'cash'),
-    stock_symbol: entry.stockSymbol || '',
-    holding_id: entry.holdingId || null,
+    type: entry.type || 'Deposit',
+    withdrawal_use: 'cash',
+    stock_symbol: null,
+    holding_id: null,
     amount: entry.amount !== '' ? Number(entry.amount) : 0,
     note: entry.note || '',
     metadata: entry.metadata || {},
@@ -69,6 +66,16 @@ export function mapLedgerToDb(entry) {
 
 // Helper to convert database row to UI holding object
 export function mapHoldingFromDb(row) {
+  const tranches = Array.isArray(row.metadata?.tranches) && row.metadata.tranches.length > 0
+    ? row.metadata.tranches
+    : (row.qty && row.buy_price ? [{
+        id: `${row.id}-t1`,
+        date: row.date,
+        qty: Number(row.qty),
+        buyPrice: Number(row.buy_price),
+        note: 'Initial purchase'
+      }] : []);
+
   return {
     id: row.id,
     date: row.date,
@@ -87,14 +94,36 @@ export function mapHoldingFromDb(row) {
     dividendPerShare: row.dividend_per_share !== null && row.dividend_per_share !== undefined ? String(row.dividend_per_share) : '',
     investmentNote: row.investment_note || '',
     newsDate: row.news_date || '',
-    ledgerId: row.ledger_id || null,
     metadata: row.metadata || {},
+    tranches: tranches,
   };
 }
 
 // Helper to convert UI holding object to database row
 export function mapHoldingToDb(holding) {
-  const buyNum = holding.buyPrice !== '' && holding.buyPrice != null ? Number(holding.buyPrice) : 0;
+  const tranches = Array.isArray(holding.tranches) && holding.tranches.length > 0
+    ? holding.tranches
+    : (holding.qty && holding.buyPrice ? [{
+        id: `${holding.id || 't'}-1`,
+        date: holding.date,
+        qty: Number(holding.qty),
+        buyPrice: Number(holding.buyPrice),
+        note: 'Initial purchase'
+      }] : []);
+
+  let totalQty = 0;
+  let totalInvested = 0;
+  tranches.forEach(t => {
+    const q = Number(t.qty) || 0;
+    const p = Number(t.buyPrice) || 0;
+    totalQty += q;
+    totalInvested += (q * p);
+  });
+
+  const avgBuyPrice = totalQty > 0 ? (totalInvested / totalQty) : (Number(holding.buyPrice) || 0);
+  const effectiveQty = totalQty > 0 ? totalQty : (Number(holding.qty) || 0);
+
+  const buyNum = Number(avgBuyPrice.toFixed(4));
   let curNum = null;
   if (holding.currentPrice !== '' && holding.currentPrice != null && !isNaN(Number(holding.currentPrice))) {
     curNum = Number(holding.currentPrice);
@@ -102,13 +131,18 @@ export function mapHoldingToDb(holding) {
     curNum = buyNum;
   }
 
+  const updatedMetadata = {
+    ...(holding.metadata || {}),
+    tranches: tranches
+  };
+
   return {
     id: holding.id,
-    date: holding.date,
+    date: tranches[0]?.date || holding.date,
     stock: (holding.stock || '').toUpperCase().trim(),
     company_name: holding.companyName || '',
     exchange: holding.exchange || 'NSE',
-    qty: holding.qty !== '' && holding.qty != null ? Number(holding.qty) : 0,
+    qty: effectiveQty,
     buy_price: buyNum,
     current_price: curNum,
     price_updated_on: holding.priceUpdatedOn || holding.date || new Date().toISOString().split('T')[0],
@@ -120,8 +154,8 @@ export function mapHoldingToDb(holding) {
     dividend_per_share: holding.dividendPerShare !== '' && holding.dividendPerShare != null ? Number(holding.dividendPerShare) : null,
     investment_note: holding.investmentNote || '',
     news_date: holding.newsDate || null,
-    ledger_id: holding.ledgerId || null,
-    metadata: holding.metadata || {},
+    ledger_id: null,
+    metadata: updatedMetadata,
     updated_at: new Date().toISOString(),
   };
 }

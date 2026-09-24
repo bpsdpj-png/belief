@@ -6,7 +6,8 @@ import {
 import {
   Plus, TrendingUp, TrendingDown, IndianRupee, Target, ShieldCheck, X, Trash2,
   Wallet, PiggyBank, ArrowDownToLine, Flame, Briefcase, Percent, Download, Pencil,
-  Database, RefreshCw, Sun, Moon, Search, Filter, CheckCircle2, ChevronRight
+  Database, RefreshCw, Sun, Moon, Search, Filter, CheckCircle2, ChevronRight,
+  ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Layers
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -115,34 +116,20 @@ const emptyTrade = () => ({
   notes: "",
 });
 
-const emptyStockDetails = () => ({
-  companyName: "",
-  stock: "",
-  exchange: "NSE",
+const emptyTranche = (date = todayLocalISO()) => ({
+  id: generateId(),
+  date: date || todayLocalISO(),
   qty: "",
   buyPrice: "",
-  currentPrice: "",
-  priceUpdatedOn: todayLocalISO(),
-  peRatio: "",
-  beta: "",
-  companySize: "Large cap",
-  valuationView: "Needs review",
-  dividendDate: "",
-  dividendPerShare: "",
-  investmentNote: "",
-  newsDate: "",
+  note: "",
 });
 
-const emptyLedger = () => ({
+const emptyLedger = (type = "Deposit") => ({
   id: generateId(),
   date: todayLocalISO(),
-  type: "Deposit",
-  withdrawalUse: "cash", // "cash" or "stock"
+  type: type, // "Deposit" or "Withdrawal"
   amount: "",
   note: "",
-  stockSymbol: "",
-  holdingId: null,
-  stockDetails: emptyStockDetails(),
 });
 
 const emptyHolding = () => ({
@@ -163,7 +150,8 @@ const emptyHolding = () => ({
   dividendPerShare: "",
   investmentNote: "",
   newsDate: "",
-  deductFromTradingCapital: true,
+  metadata: {},
+  tranches: [emptyTranche()],
 });
 
 const fmtINR = (n) => {
@@ -226,6 +214,94 @@ function xirr(cashflows) {
   return rate * 100;
 }
 
+function calcHoldingXIRR(dateStr, invested, curVal) {
+  if (!dateStr || invested <= 0 || curVal <= 0) return null;
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (isNaN(d.getTime())) return null;
+  const days = Math.max(1, (now - d) / (1000 * 60 * 60 * 24));
+  if (days < 5) {
+    return ((curVal - invested) / invested) * 100;
+  }
+  const ratio = curVal / invested;
+  const annualRate = (Math.pow(ratio, 365 / days) - 1) * 100;
+  if (!isFinite(annualRate) || isNaN(annualRate)) return null;
+  return annualRate;
+}
+
+function getHoldingMetrics(h) {
+  const tranches = Array.isArray(h?.tranches) && h.tranches.length > 0
+    ? h.tranches
+    : (h?.qty && h?.buyPrice ? [{
+        id: `${h.id}-default`,
+        date: h.date || todayLocalISO(),
+        qty: Number(h.qty) || 0,
+        buyPrice: Number(h.buyPrice) || 0,
+        note: "Initial purchase",
+      }] : []);
+
+  let totalQty = 0;
+  let totalInvested = 0;
+  const cashflows = [];
+
+  tranches.forEach(t => {
+    const q = Number(t.qty) || 0;
+    const p = Number(t.buyPrice) || 0;
+    totalQty += q;
+    totalInvested += (q * p);
+    if (q > 0 && p > 0 && t.date) {
+      cashflows.push({
+        date: new Date(t.date),
+        amount: -(q * p),
+      });
+    }
+  });
+
+  // Fallback to top-level qty & buyPrice if tranches sum was 0
+  if (totalQty === 0 && Number(h?.qty) > 0) {
+    totalQty = Number(h.qty) || 0;
+    const bp = Number(h.buyPrice) || 0;
+    totalInvested = totalQty * bp;
+    if (totalInvested > 0 && h.date) {
+      cashflows.push({ date: new Date(h.date), amount: -totalInvested });
+    }
+  }
+
+  const avgBuyPrice = totalQty > 0 ? (totalInvested / totalQty) : (Number(h?.buyPrice) || 0);
+  const cp = h?.currentPrice !== "" && h?.currentPrice != null && !isNaN(Number(h?.currentPrice))
+    ? Number(h.currentPrice)
+    : avgBuyPrice;
+  const currentValue = totalQty * cp;
+  const pnl = currentValue - totalInvested;
+  const returnPct = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+
+  // Add final current market value on today for XIRR
+  if (currentValue > 0) {
+    cashflows.push({ date: new Date(), amount: currentValue });
+  }
+
+  let holdingXIRR = null;
+  if (cashflows.length >= 2) {
+    holdingXIRR = xirr(cashflows);
+  }
+  if (holdingXIRR === null && totalInvested > 0 && h?.date) {
+    holdingXIRR = calcHoldingXIRR(h.date, totalInvested, currentValue);
+  }
+
+  return {
+    tranches,
+    totalQty,
+    totalInvested,
+    avgBuyPrice,
+    currentPrice: cp,
+    currentValue,
+    pnl,
+    returnPct,
+    holdingXIRR,
+    cashflows,
+  };
+}
+
 export default function Dashboard() {
   const [loaded, setLoaded] = useState(false);
   const [startingCapital, setStartingCapital] = useState(975000);
@@ -243,6 +319,9 @@ export default function Dashboard() {
   const [showLedgerForm, setShowLedgerForm] = useState(false);
   const [showHoldingForm, setShowHoldingForm] = useState(false);
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [showQuickPartModal, setShowQuickPartModal] = useState(false);
+  const [quickPartHoldingId, setQuickPartHoldingId] = useState(null);
+  const [quickPartDraft, setQuickPartDraft] = useState({ date: todayLocalISO(), qty: "", buyPrice: "", note: "" });
 
   const [tradeDraft, setTradeDraft] = useState(emptyTrade());
   const [editingTradeId, setEditingTradeId] = useState(null);
@@ -329,22 +408,43 @@ export default function Dashboard() {
     const netOf = (t) => (Number(t.gross) || 0) - (Number(t.charges) || 0);
     const totalNet = trades.reduce((s, t) => s + netOf(t), 0);
     const deposits = ledger.filter(l => l.type === "Deposit").reduce((s, l) => s + (Number(l.amount) || 0), 0);
-    const cashWithdrawn = ledger.filter(l => l.type === "Withdrawal" && (l.withdrawalUse === "cash" || !l.withdrawalUse)).reduce((s, l) => s + (Number(l.amount) || 0), 0);
-    const movedIntoStocks = ledger.filter(l => l.type === "Investment" || (l.type === "Withdrawal" && l.withdrawalUse === "stock")).reduce((s, l) => s + (Number(l.amount) || 0), 0);
-    const totalWithdrawals = cashWithdrawn + movedIntoStocks;
+    const withdrawals = ledger.filter(l => l.type === "Withdrawal").reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const netCapitalAdded = deposits - withdrawals;
 
-    const holdingsInvested = holdings.reduce((s, h) => s + (Number(h.qty) || 0) * (Number(h.buyPrice) || 0), 0);
-    const holdingsCurrentValue = holdings.reduce((s, h) => {
-      const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : Number(h.buyPrice) || 0;
-      return s + (Number(h.qty) || 0) * cp;
-    }, 0);
-    const holdingsUnrealized = holdingsCurrentValue - holdingsInvested;
-    const totalInvestedOut = Math.max(movedIntoStocks, holdingsInvested);
-
-    const currentCapital = startingCapital + deposits - cashWithdrawn - totalInvestedOut + totalNet;
+    const currentCapital = startingCapital + netCapitalAdded + totalNet;
     const capitalBase = startingCapital + deposits;
-    const netCapitalAdded = deposits - cashWithdrawn - movedIntoStocks;
     const overallROI = capitalBase > 0 ? (totalNet / capitalBase) * 100 : 0;
+
+    // Equity Holdings multi-tranche metrics & portfolio cashflows
+    let holdingsInvested = 0;
+    let holdingsCurrentValue = 0;
+    let totalTranchesCount = 0;
+    const allEquityFlows = [];
+
+    holdings.forEach(h => {
+      const m = getHoldingMetrics(h);
+      holdingsInvested += m.totalInvested;
+      holdingsCurrentValue += m.currentValue;
+      totalTranchesCount += m.tranches.length;
+      m.tranches.forEach(t => {
+        const q = Number(t.qty) || 0;
+        const p = Number(t.buyPrice) || 0;
+        if (q > 0 && p > 0 && t.date) {
+          allEquityFlows.push({
+            date: new Date(t.date),
+            amount: -(q * p),
+          });
+        }
+      });
+    });
+
+    if (holdingsCurrentValue > 0) {
+      allEquityFlows.push({ date: new Date(), amount: holdingsCurrentValue });
+    }
+
+    const holdingsUnrealized = holdingsCurrentValue - holdingsInvested;
+    const holdingsReturnPct = holdingsInvested > 0 ? (holdingsUnrealized / holdingsInvested) * 100 : 0;
+    const equityXIRR = xirr(allEquityFlows);
 
     const today = todayLocalISO();
     const todayPnl = trades.filter(t => t.date === today).reduce((s, t) => s + netOf(t), 0);
@@ -398,7 +498,7 @@ export default function Dashboard() {
     const downsideFromStart = minEquityFromStart - startingCapital;
     const downsideFromStartPct = startingCapital > 0 ? (downsideFromStart / startingCapital) * 100 : 0;
 
-    const profitWithdrawalDeficit = totalNet - totalWithdrawals;
+    const profitWithdrawalDeficit = totalNet - withdrawals;
 
     const dayPnls = Object.values(dayMap);
     const profitableDays = dayPnls.filter(v => v > 0).length;
@@ -457,37 +557,26 @@ export default function Dashboard() {
       .map(s => ({ ...s, net: Math.round(s.net), winRate: s.count ? (s.wins / s.count) * 100 : 0 }))
       .sort((a, b) => b.net - a.net);
 
-    const allDates = [
-      ...trades.map(t => t.date), ...ledger.map(l => l.date), ...holdings.map(h => h.date),
+    const allTradingDates = [
+      ...trades.map(t => t.date), ...ledger.map(l => l.date),
     ].filter(Boolean).sort();
-    const firstDate = allDates.length ? new Date(allDates[0]) : new Date();
+    const firstDate = allTradingDates.length ? new Date(allTradingDates[0]) : new Date();
     const tradingFlows = [{ date: firstDate, amount: -startingCapital }];
     ledger.forEach(l => {
       const amt = Number(l.amount) || 0;
       if (l.type === "Deposit") tradingFlows.push({ date: new Date(l.date), amount: -amt });
       if (l.type === "Withdrawal") tradingFlows.push({ date: new Date(l.date), amount: amt });
-      if (l.type === "Investment") tradingFlows.push({ date: new Date(l.date), amount: -amt });
-    });
-    holdings.forEach(h => {
-      tradingFlows.push({ date: new Date(h.date), amount: -((Number(h.qty) || 0) * (Number(h.buyPrice) || 0)) });
     });
     tradingFlows.push({ date: new Date(), amount: currentCapital });
     const tradingXIRR = xirr(tradingFlows);
 
-    const equityFlows = holdings.map(h => ({
-      date: new Date(h.date),
-      amount: -((Number(h.qty) || 0) * (Number(h.buyPrice) || 0)),
-    }));
-    if (holdingsCurrentValue > 0) equityFlows.push({ date: new Date(), amount: holdingsCurrentValue });
-    const equityXIRR = xirr(equityFlows);
-
     return {
       totalNet, currentCapital, overallROI, dailyROI, monthlyROI, todayPnl, monthNet,
       winRate, avgWin, avgLoss, profitFactor, discipline, curve, maxDD, consistency, avgDailyPnl, avgDailyROI, streak, streakType,
-      monthly, weekly, deposits, withdrawals: totalWithdrawals, cashWithdrawn, movedIntoStocks, netCapitalAdded, capitalBase, tradeCount: trades.length,
+      monthly, weekly, deposits, withdrawals, netCapitalAdded, capitalBase, tradeCount: trades.length,
       winCount: wins.length, lossCount: losses.length,
-      holdingsInvested, holdingsCurrentValue, holdingsUnrealized, equityXIRR, tradingXIRR,
-      totalInvestedOut, strategyPerf,
+      holdingsInvested, holdingsCurrentValue, holdingsUnrealized, holdingsReturnPct, equityXIRR, tradingXIRR,
+      totalTranchesCount, strategyPerf,
       capitalAppreciation, capitalAppreciationPct, downsideFromStart, downsideFromStartPct, profitWithdrawalDeficit,
     };
   }, [trades, ledger, holdings, startingCapital, tradesSorted]);
@@ -547,66 +636,26 @@ export default function Dashboard() {
     }
   };
 
-  // Ledger actions
-  // Helper to update stock detail in ledgerDraft
-  const updateLedgerStockDetail = (field, val) => {
-    setLedgerDraft(prev => {
-      const nextStock = { ...(prev.stockDetails || emptyStockDetails()), [field]: val };
-      let newAmount = prev.amount;
-      if (field === "qty" || field === "buyPrice") {
-        const q = field === "qty" ? Number(val) : Number(nextStock.qty);
-        const p = field === "buyPrice" ? Number(val) : Number(nextStock.buyPrice);
-        if (q > 0 && p > 0) {
-          newAmount = String(q * p);
-        }
-      }
-      return {
-        ...prev,
-        stockDetails: nextStock,
-        amount: newAmount,
-      };
-    });
+  // Ledger actions (Pure Capital Movement)
+  const openNewDepositModal = () => {
+    setLedgerDraft(emptyLedger("Deposit"));
+    setEditingLedgerId(null);
+    setShowLedgerForm(true);
   };
 
-  // Ledger actions
-  const startEditLedger = (l) => {
-    let stockDetails = emptyStockDetails();
-    const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
-    if (isStock) {
-      const linked = holdings.find(h => (l.holdingId && h.id === l.holdingId) || (l.stockSymbol && h.stock === l.stockSymbol));
-      if (linked) {
-        stockDetails = {
-          companyName: linked.companyName || linked.stock || "",
-          stock: linked.stock || "",
-          exchange: linked.exchange || "NSE",
-          qty: linked.qty || "",
-          buyPrice: linked.buyPrice || "",
-          currentPrice: linked.currentPrice || "",
-          priceUpdatedOn: linked.priceUpdatedOn || linked.date,
-          peRatio: linked.peRatio || "",
-          beta: linked.beta || "",
-          companySize: linked.companySize || "Large cap",
-          valuationView: linked.valuationView || "Needs review",
-          dividendDate: linked.dividendDate || "",
-          dividendPerShare: linked.dividendPerShare || "",
-          investmentNote: linked.investmentNote || "",
-          newsDate: linked.newsDate || "",
-        };
-      } else if (l.stockSymbol) {
-        stockDetails.stock = l.stockSymbol;
-      }
-    }
+  const openNewWithdrawModal = () => {
+    setLedgerDraft(emptyLedger("Withdrawal"));
+    setEditingLedgerId(null);
+    setShowLedgerForm(true);
+  };
 
+  const startEditLedger = (l) => {
     setLedgerDraft({
       id: l.id,
       date: l.date,
-      type: l.type === "Investment" ? "Withdrawal" : l.type,
-      withdrawalUse: l.type === "Investment" ? "stock" : (l.withdrawalUse || "cash"),
+      type: l.type === "Withdrawal" ? "Withdrawal" : "Deposit",
       amount: l.amount || "",
       note: l.note || "",
-      stockSymbol: l.stockSymbol || "",
-      holdingId: l.holdingId || null,
-      stockDetails,
     });
     setEditingLedgerId(l.id);
     setShowLedgerForm(true);
@@ -621,70 +670,15 @@ export default function Dashboard() {
   const addLedger = async () => {
     setSaveState("saving");
     try {
-      const isStockInvestment = ledgerDraft.type === "Withdrawal" && ledgerDraft.withdrawalUse === "stock";
-      let amountNum = Number(ledgerDraft.amount) || 0;
-
-      if (isStockInvestment && ledgerDraft.stockDetails?.qty && ledgerDraft.stockDetails?.buyPrice) {
-        const computed = (Number(ledgerDraft.stockDetails.qty) || 0) * (Number(ledgerDraft.stockDetails.buyPrice) || 0);
-        if (computed > 0) {
-          amountNum = computed;
-        }
-      }
-
       const ledgerId = editingLedgerId || ledgerDraft.id || generateId();
-      let holdingId = ledgerDraft.holdingId || null;
-      let nextHoldings = [...holdings];
-
-      // If stock investment, sync to holdings
-      if (isStockInvestment && (ledgerDraft.stockDetails?.stock || ledgerDraft.stockDetails?.companyName)) {
-        const stockSymbol = (ledgerDraft.stockDetails.stock || ledgerDraft.stockDetails.companyName).toUpperCase().trim();
-        const existingHolding = holdings.find(h => (holdingId && h.id === holdingId) || h.ledgerId === ledgerId || h.stock === stockSymbol);
-        const resolvedHoldingId = existingHolding ? existingHolding.id : (holdingId || generateId());
-        holdingId = resolvedHoldingId;
-
-        const holdingObj = {
-          id: resolvedHoldingId,
-          date: ledgerDraft.date,
-          stock: stockSymbol,
-          companyName: ledgerDraft.stockDetails.companyName || stockSymbol,
-          exchange: ledgerDraft.stockDetails.exchange || "NSE",
-          qty: ledgerDraft.stockDetails.qty || "",
-          buyPrice: ledgerDraft.stockDetails.buyPrice || "",
-          currentPrice: ledgerDraft.stockDetails.currentPrice !== "" && ledgerDraft.stockDetails.currentPrice != null ? ledgerDraft.stockDetails.currentPrice : ledgerDraft.stockDetails.buyPrice,
-          priceUpdatedOn: ledgerDraft.stockDetails.priceUpdatedOn || ledgerDraft.date,
-          peRatio: ledgerDraft.stockDetails.peRatio || "",
-          beta: ledgerDraft.stockDetails.beta || "",
-          companySize: ledgerDraft.stockDetails.companySize || "Large cap",
-          valuationView: ledgerDraft.stockDetails.valuationView || "Needs review",
-          dividendDate: ledgerDraft.stockDetails.dividendDate || "",
-          dividendPerShare: ledgerDraft.stockDetails.dividendPerShare || "",
-          investmentNote: ledgerDraft.stockDetails.investmentNote || "",
-          newsDate: ledgerDraft.stockDetails.newsDate || "",
-          ledgerId: ledgerId,
-        };
-
-        const idx = nextHoldings.findIndex(h => h.id === resolvedHoldingId);
-        if (idx >= 0) {
-          nextHoldings[idx] = holdingObj;
-        } else {
-          nextHoldings.push(holdingObj);
-        }
-        setHoldings(nextHoldings);
-
-        if (dbStatus.tablesReady) {
-          await persistHolding(holdingObj);
-        }
-      }
+      const amountNum = Number(ledgerDraft.amount) || 0;
 
       const ledgerObj = {
         id: ledgerId,
-        date: ledgerDraft.date,
-        type: ledgerDraft.type,
-        withdrawalUse: ledgerDraft.type === "Withdrawal" ? (ledgerDraft.withdrawalUse || "cash") : "cash",
+        date: ledgerDraft.date || todayLocalISO(),
+        type: ledgerDraft.type === "Withdrawal" ? "Withdrawal" : "Deposit",
         amount: String(amountNum),
-        note: ledgerDraft.note || (isStockInvestment ? `Stock purchase: ${ledgerDraft.stockDetails?.stock || ""}` : ""),
-        stockSymbol: isStockInvestment ? (ledgerDraft.stockDetails?.stock || "") : "",
-        holdingId: isStockInvestment ? holdingId : null,
+        note: ledgerDraft.note || "",
       };
 
       let nextLedger;
@@ -699,7 +693,7 @@ export default function Dashboard() {
         if (dbStatus.tablesReady) await persistLedger(ledgerObj);
       }
 
-      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings, targetPct });
 
       setLedgerDraft(emptyLedger());
       setShowLedgerForm(false);
@@ -715,7 +709,7 @@ export default function Dashboard() {
     if (!withdrawDraft.amount) return;
     setSaveState("saving");
     try {
-      const created = { id: generateId(), type: "Withdrawal", withdrawalUse: "cash", ...withdrawDraft };
+      const created = { id: generateId(), type: "Withdrawal", ...withdrawDraft };
       const nextLedger = [...ledger, created];
       setLedger(nextLedger);
       saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings, targetPct });
@@ -731,7 +725,6 @@ export default function Dashboard() {
   };
 
   const deleteLedger = async (id) => {
-    const entry = ledger.find(l => l.id === id);
     if (!confirm("Are you sure you want to delete this capital entry?")) return;
     setSaveState("saving");
     try {
@@ -739,19 +732,7 @@ export default function Dashboard() {
       setLedger(nextLedger);
       if (dbStatus.tablesReady) await removeLedgerFromDb(id);
 
-      let nextHoldings = holdings;
-      if (entry && (entry.holdingId || entry.withdrawalUse === "stock" || entry.stockSymbol)) {
-        const linkedId = entry.holdingId;
-        const sym = (entry.stockSymbol || "").toUpperCase().trim();
-        const removed = holdings.find(h => (linkedId && h.id === linkedId) || h.ledgerId === id || (sym && h.stock === sym));
-        if (removed) {
-          nextHoldings = holdings.filter(h => h.id !== removed.id);
-          setHoldings(nextHoldings);
-          if (dbStatus.tablesReady) await removeHoldingFromDb(removed.id);
-        }
-      }
-
-      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
+      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings, targetPct });
 
       if (editingLedgerId === id) cancelLedgerForm();
       setSaveState("saved");
@@ -762,8 +743,146 @@ export default function Dashboard() {
     }
   };
 
-  // Holdings actions
+  // Holdings Quick Part / Tranche Actions
+  const openQuickPartModal = (holdingId) => {
+    const target = holdings.find(h => h.id === holdingId);
+    setQuickPartHoldingId(holdingId);
+    setQuickPartDraft({
+      date: todayLocalISO(),
+      qty: "",
+      buyPrice: target?.currentPrice || target?.buyPrice || "",
+      note: "",
+    });
+    setShowQuickPartModal(true);
+  };
+
+  const saveQuickPart = async (holdingId, partData) => {
+    const current = holdings.find(h => h.id === holdingId);
+    if (!current) return;
+
+    setSaveState("saving");
+    try {
+      const newTranche = {
+        id: generateId(),
+        date: partData.date || todayLocalISO(),
+        qty: Number(partData.qty) || 0,
+        buyPrice: Number(partData.buyPrice) || 0,
+        note: partData.note || "",
+      };
+
+      const existingTranches = Array.isArray(current.tranches) && current.tranches.length > 0
+        ? [...current.tranches]
+        : (current.qty && current.buyPrice ? [{
+            id: `${current.id}-t1`,
+            date: current.date || todayLocalISO(),
+            qty: Number(current.qty),
+            buyPrice: Number(current.buyPrice),
+            note: "Initial purchase",
+          }] : []);
+
+      const updatedTranches = [...existingTranches, newTranche];
+
+      let totalQty = 0;
+      let totalCost = 0;
+      updatedTranches.forEach(t => {
+        const q = Number(t.qty) || 0;
+        const p = Number(t.buyPrice) || 0;
+        totalQty += q;
+        totalCost += (q * p);
+      });
+      const avgBuy = totalQty > 0 ? (totalCost / totalQty) : 0;
+
+      const updatedHolding = {
+        ...current,
+        qty: String(totalQty),
+        buyPrice: String(Number(avgBuy.toFixed(2))),
+        tranches: updatedTranches,
+        metadata: {
+          ...(current.metadata || {}),
+          tranches: updatedTranches,
+        },
+      };
+
+      const nextHoldings = holdings.map(h => (h.id === holdingId ? updatedHolding : h));
+      setHoldings(nextHoldings);
+      saveLocalCache({ startingCapital, trades, ledger, holdings: nextHoldings, targetPct });
+
+      if (dbStatus.tablesReady) {
+        await persistHolding(updatedHolding);
+      }
+
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2000);
+    } catch (e) {
+      console.error("Failed to add purchase part:", e);
+      setSaveState("error");
+    }
+  };
+
+  const deleteHoldingTranche = async (holdingId, trancheId) => {
+    const current = holdings.find(h => h.id === holdingId);
+    if (!current) return;
+
+    setSaveState("saving");
+    try {
+      const existingTranches = Array.isArray(current.tranches) ? current.tranches : [];
+      const filteredTranches = existingTranches.filter(t => t.id !== trancheId);
+
+      if (filteredTranches.length === 0) {
+        alert("A position must have at least one purchase part. To remove the position, use Delete Position.");
+        setSaveState("idle");
+        return;
+      }
+
+      let totalQty = 0;
+      let totalCost = 0;
+      filteredTranches.forEach(t => {
+        const q = Number(t.qty) || 0;
+        const p = Number(t.buyPrice) || 0;
+        totalQty += q;
+        totalCost += (q * p);
+      });
+      const avgBuy = totalQty > 0 ? (totalCost / totalQty) : 0;
+
+      const updatedHolding = {
+        ...current,
+        qty: String(totalQty),
+        buyPrice: String(Number(avgBuy.toFixed(2))),
+        tranches: filteredTranches,
+        metadata: {
+          ...(current.metadata || {}),
+          tranches: filteredTranches,
+        },
+      };
+
+      const nextHoldings = holdings.map(h => (h.id === holdingId ? updatedHolding : h));
+      setHoldings(nextHoldings);
+      saveLocalCache({ startingCapital, trades, ledger, holdings: nextHoldings, targetPct });
+
+      if (dbStatus.tablesReady) {
+        await persistHolding(updatedHolding);
+      }
+
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2000);
+    } catch (e) {
+      console.error("Failed to delete purchase part:", e);
+      setSaveState("error");
+    }
+  };
+
+  // Holdings Actions (Independent Equity Tracking)
   const startEditHolding = (h) => {
+    const tranches = Array.isArray(h.tranches) && h.tranches.length > 0
+      ? h.tranches.map(t => ({ ...t }))
+      : [{
+          id: generateId(),
+          date: h.date || todayLocalISO(),
+          qty: h.qty != null ? String(h.qty) : "",
+          buyPrice: h.buyPrice != null ? String(h.buyPrice) : "",
+          note: "Initial purchase",
+        }];
+
     setHoldingDraft({
       id: h.id,
       date: h.date || todayLocalISO(),
@@ -782,9 +901,8 @@ export default function Dashboard() {
       dividendPerShare: h.dividendPerShare != null ? String(h.dividendPerShare) : "",
       investmentNote: h.investmentNote || "",
       newsDate: h.newsDate || "",
-      deductFromTradingCapital: false,
-      ledgerId: h.ledgerId || null,
       metadata: h.metadata || {},
+      tranches: tranches,
     });
     setEditingHoldingId(h.id);
     setShowHoldingForm(true);
@@ -800,81 +918,81 @@ export default function Dashboard() {
     setSaveState("saving");
     try {
       const holdingId = editingHoldingId || holdingDraft.id || generateId();
-      const buyPriceNum = Number(holdingDraft.buyPrice) || 0;
-      const qtyNum = Number(holdingDraft.qty) || 0;
-      const totalCost = buyPriceNum * qtyNum;
       const stockSymbol = (holdingDraft.stock || holdingDraft.companyName || "STOCK").toUpperCase().trim();
 
-      let linkedLedgerId = holdingDraft.ledgerId;
-      if (!linkedLedgerId) {
-        const found = ledger.find(l => l.holdingId === holdingId || (l.stockSymbol === stockSymbol && l.withdrawalUse === "stock"));
-        if (found) linkedLedgerId = found.id;
-      }
+      const rawTranches = Array.isArray(holdingDraft.tranches) && holdingDraft.tranches.length > 0
+        ? holdingDraft.tranches
+        : [{
+            id: generateId(),
+            date: holdingDraft.date || todayLocalISO(),
+            qty: holdingDraft.qty,
+            buyPrice: holdingDraft.buyPrice,
+            note: "Initial purchase",
+          }];
 
-      let newLedgerEntry = null;
-      if (!editingHoldingId && holdingDraft.deductFromTradingCapital && totalCost > 0) {
-        linkedLedgerId = linkedLedgerId || generateId();
-        newLedgerEntry = {
-          id: linkedLedgerId,
-          date: holdingDraft.date,
-          type: "Withdrawal",
-          withdrawalUse: "stock",
-          amount: String(totalCost),
-          note: `Stock purchase: ${stockSymbol} (${holdingDraft.companyName || stockSymbol})`,
-          stockSymbol: stockSymbol,
-          holdingId: holdingId,
-        };
-      }
+      const tranches = rawTranches.map(t => ({
+        id: t.id || generateId(),
+        date: t.date || todayLocalISO(),
+        qty: Number(t.qty) || 0,
+        buyPrice: Number(t.buyPrice) || 0,
+        note: t.note || "",
+      })).filter(t => t.qty > 0 && t.buyPrice > 0);
+
+      let totalQty = 0;
+      let totalCost = 0;
+      tranches.forEach(t => {
+        totalQty += t.qty;
+        totalCost += (t.qty * t.buyPrice);
+      });
+
+      const avgBuyPrice = totalQty > 0 ? (totalCost / totalQty) : (Number(holdingDraft.buyPrice) || 0);
+      const effectiveQty = totalQty > 0 ? totalQty : (Number(holdingDraft.qty) || 0);
 
       const holdingObj = {
         ...holdingDraft,
         id: holdingId,
+        date: tranches[0]?.date || holdingDraft.date || todayLocalISO(),
         stock: stockSymbol,
         companyName: holdingDraft.companyName || stockSymbol,
-        currentPrice: holdingDraft.currentPrice !== "" && holdingDraft.currentPrice != null ? holdingDraft.currentPrice : holdingDraft.buyPrice,
+        exchange: holdingDraft.exchange || "NSE",
+        qty: String(effectiveQty),
+        buyPrice: String(Number(avgBuyPrice.toFixed(2))),
+        currentPrice: holdingDraft.currentPrice !== "" && holdingDraft.currentPrice != null
+          ? String(holdingDraft.currentPrice)
+          : String(Number(avgBuyPrice.toFixed(2))),
         priceUpdatedOn: holdingDraft.priceUpdatedOn || todayLocalISO(),
-        ledgerId: linkedLedgerId || null,
-        metadata: holdingDraft.metadata || {},
+        tranches: tranches.length > 0 ? tranches : [{
+          id: generateId(),
+          date: holdingDraft.date || todayLocalISO(),
+          qty: effectiveQty,
+          buyPrice: avgBuyPrice,
+          note: "Initial purchase",
+        }],
+        metadata: {
+          ...(holdingDraft.metadata || {}),
+          tranches: tranches.length > 0 ? tranches : [{
+            id: generateId(),
+            date: holdingDraft.date || todayLocalISO(),
+            qty: effectiveQty,
+            buyPrice: avgBuyPrice,
+            note: "Initial purchase",
+          }],
+        },
       };
 
       let nextHoldings;
-      let nextLedger = ledger;
-
       if (editingHoldingId) {
         nextHoldings = holdings.map(h => (h.id === editingHoldingId ? holdingObj : h));
         setHoldings(nextHoldings);
-        const res = await persistHolding(holdingObj);
-        if (res?.error) console.error("Error updating holding in Supabase:", res.error);
-
-        // Keep linked ledger entry in sync if it exists
-        const linkedLedger = ledger.find(l => l.holdingId === editingHoldingId || (holdingObj.ledgerId && l.id === holdingObj.ledgerId) || (l.stockSymbol === stockSymbol && l.withdrawalUse === "stock"));
-        if (linkedLedger) {
-          const updatedLedger = {
-            ...linkedLedger,
-            amount: totalCost > 0 ? String(totalCost) : linkedLedger.amount,
-            stockSymbol: holdingObj.stock,
-            holdingId: holdingId,
-            note: `Stock purchase: ${holdingObj.stock} (${holdingObj.companyName || holdingObj.stock})`,
-          };
-          nextLedger = ledger.map(l => (l.id === linkedLedger.id ? updatedLedger : l));
-          setLedger(nextLedger);
-          await persistLedger(updatedLedger);
-        }
+        await persistHolding(holdingObj);
         setEditingHoldingId(null);
       } else {
         nextHoldings = [...holdings, holdingObj];
         setHoldings(nextHoldings);
-        const res = await persistHolding(holdingObj);
-        if (res?.error) console.error("Error creating holding in Supabase:", res.error);
-
-        if (newLedgerEntry) {
-          nextLedger = [...ledger, newLedgerEntry];
-          setLedger(nextLedger);
-          await persistLedger(newLedgerEntry);
-        }
+        await persistHolding(holdingObj);
       }
 
-      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
+      saveLocalCache({ startingCapital, trades, ledger, holdings: nextHoldings, targetPct });
 
       setHoldingDraft(emptyHolding());
       setShowHoldingForm(false);
@@ -889,23 +1007,11 @@ export default function Dashboard() {
   const deleteHolding = async (id) => {
     setSaveState("saving");
     try {
-      const target = holdings.find(h => h.id === id);
       const nextHoldings = holdings.filter(h => h.id !== id);
       setHoldings(nextHoldings);
-
-      const linked = ledger.find(l => l.holdingId === id || (target && l.id === target.ledgerId) || (target && l.stockSymbol === target.stock && l.withdrawalUse === "stock"));
-      let nextLedger = ledger;
-      if (linked) {
-        nextLedger = ledger.filter(l => l.id !== linked.id);
-        setLedger(nextLedger);
-      }
-
-      saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
-
+      saveLocalCache({ startingCapital, trades, ledger, holdings: nextHoldings, targetPct });
       await removeHoldingFromDb(id);
-      if (linked) {
-        await removeLedgerFromDb(linked.id);
-      }
+
       if (editingHoldingId === id) cancelHoldingForm();
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
@@ -925,31 +1031,10 @@ export default function Dashboard() {
       ...(field === "currentPrice" || field === "buyPrice" ? { priceUpdatedOn: todayLocalISO() } : {}),
     };
 
-    // 1. Update React state immediately
     const nextHoldings = holdings.map(h => (h.id === id ? updated : h));
     setHoldings(nextHoldings);
+    saveLocalCache({ startingCapital, trades, ledger, holdings: nextHoldings, targetPct });
 
-    // 2. If qty or buyPrice changed, keep linked ledger entry in sync
-    let nextLedger = ledger;
-    if (field === "qty" || field === "buyPrice") {
-      const qtyN = Number(field === "qty" ? val : updated.qty) || 0;
-      const buyN = Number(field === "buyPrice" ? val : updated.buyPrice) || 0;
-      const cost = qtyN * buyN;
-      const linked = ledger.find(l => l.holdingId === id || (updated.ledgerId && l.id === updated.ledgerId) || (l.stockSymbol === updated.stock && l.withdrawalUse === "stock"));
-      if (linked && cost > 0) {
-        const updatedLedger = { ...linked, amount: String(cost), stockSymbol: updated.stock };
-        nextLedger = ledger.map(l => (l.id === linked.id ? updatedLedger : l));
-        setLedger(nextLedger);
-        if (dbStatus.tablesReady) {
-          persistLedger(updatedLedger).catch(err => console.error("Error syncing ledger amount:", err));
-        }
-      }
-    }
-
-    // 3. Update localStorage cache synchronously
-    saveLocalCache({ startingCapital, trades, ledger: nextLedger, holdings: nextHoldings, targetPct });
-
-    // 4. Persist to Supabase
     try {
       setSaveState("saving");
       const res = await persistHolding(updated);
@@ -1263,7 +1348,8 @@ export default function Dashboard() {
             setStartingCapital={setStartingCapital}
             ledger={ledger}
             stats={stats}
-            openNewLedgerForm={() => { setLedgerDraft(emptyLedger()); setEditingLedgerId(null); setShowLedgerForm(true); }}
+            openNewDepositModal={openNewDepositModal}
+            openNewWithdrawModal={openNewWithdrawModal}
             startEditLedger={startEditLedger}
             deleteLedger={deleteLedger}
           />
@@ -1277,6 +1363,8 @@ export default function Dashboard() {
             startEditHolding={startEditHolding}
             deleteHolding={deleteHolding}
             updateHoldingField={updateHoldingField}
+            openQuickPartModal={openQuickPartModal}
+            deleteHoldingTranche={deleteHoldingTranche}
             fetchHoldingLiveCMP={fetchHoldingLiveCMP}
             fetchAllLiveCMPs={fetchAllLiveCMPs}
             fetchingQuotes={fetchingQuotes}
@@ -1466,11 +1554,44 @@ export default function Dashboard() {
       {showLedgerForm && (
         <ModalWrapper
           onClose={cancelLedgerForm}
-          title={editingLedgerId ? "Edit Capital Movement" : "Record capital movement"}
-          subtitle="Keep deposits and withdrawals separate from trading profits"
+          title={editingLedgerId ? "Edit Capital Movement" : (ledgerDraft.type === "Deposit" ? "Add Capital (Deposit)" : "Record Capital Withdrawal")}
+          subtitle="Keep deposits and withdrawals strictly tracked for accurate trading capital and ROI"
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Date & Movement Selection */}
+            {/* Movement Selection Buttons */}
+            <div>
+              <label>Movement Type</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, height: 44 }}>
+                <button
+                  type="button"
+                  onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Deposit" }))}
+                  style={{
+                    borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    background: ledgerDraft.type === "Deposit" ? "var(--color-win-soft)" : "var(--bg-elevated)",
+                    border: ledgerDraft.type === "Deposit" ? "2px solid var(--color-win)" : "1px solid var(--border-subtle)",
+                    color: ledgerDraft.type === "Deposit" ? "var(--color-win-text)" : "var(--text-secondary)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}
+                >
+                  <ArrowDownLeft size={16} /> + Deposit (Add Capital)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Withdrawal" }))}
+                  style={{
+                    borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    background: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-soft)" : "var(--bg-elevated)",
+                    border: ledgerDraft.type === "Withdrawal" ? "2px solid var(--color-loss)" : "1px solid var(--border-subtle)",
+                    color: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-text)" : "var(--text-secondary)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}
+                >
+                  <ArrowUpRight size={16} /> - Withdrawal (Withdraw Capital)
+                </button>
+              </div>
+            </div>
+
+            {/* Date & Amount */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label>Date</label>
@@ -1482,264 +1603,23 @@ export default function Dashboard() {
               </div>
 
               <div>
-                <label>Movement</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, height: 44 }}>
-                  <button
-                    type="button"
-                    onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Deposit" }))}
-                    style={{
-                      borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
-                      background: ledgerDraft.type === "Deposit" ? "var(--color-win-soft)" : "var(--bg-elevated)",
-                      border: ledgerDraft.type === "Deposit" ? "2px solid var(--color-win)" : "1px solid var(--border-subtle)",
-                      color: ledgerDraft.type === "Deposit" ? "var(--color-win-text)" : "var(--text-secondary)",
-                    }}
-                  >
-                    Deposit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLedgerDraft(prev => ({ ...prev, type: "Withdrawal" }))}
-                    style={{
-                      borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
-                      background: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-soft)" : "var(--bg-elevated)",
-                      border: ledgerDraft.type === "Withdrawal" ? "2px solid var(--color-loss)" : "1px solid var(--border-subtle)",
-                      color: ledgerDraft.type === "Withdrawal" ? "var(--color-loss-text)" : "var(--text-secondary)",
-                    }}
-                  >
-                    Withdrawal
-                  </button>
-                </div>
+                <label>{ledgerDraft.type === "Deposit" ? "Amount Deposited (₹)" : "Amount Withdrawn (₹)"}</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 100000"
+                  className="mono"
+                  value={ledgerDraft.amount}
+                  onChange={e => setLedgerDraft(prev => ({ ...prev, amount: e.target.value }))}
+                  style={{ fontSize: 16, fontWeight: 700 }}
+                />
               </div>
             </div>
 
-            {/* When Withdrawal is selected: "Withdrawal used for" */}
-            {ledgerDraft.type === "Withdrawal" && (
-              <div style={{
-                background: "var(--bg-elevated)", padding: 14, borderRadius: 10,
-                border: "1px solid var(--border-subtle)"
-              }}>
-                <label>Withdrawal used for</label>
-                <select
-                  value={ledgerDraft.withdrawalUse || "cash"}
-                  onChange={e => setLedgerDraft(prev => ({ ...prev, withdrawalUse: e.target.value }))}
-                  style={{ fontWeight: 600, fontSize: 14 }}
-                >
-                  <option value="cash">Cash withdrawal</option>
-                  <option value="stock">Stock investment</option>
-                </select>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.4 }}>
-                  Each movement is reported separately in equity wealth / compound cash net profit from trading profit.
-                </div>
-              </div>
-            )}
-
-            {/* Amount Input */}
+            {/* Notes / Purpose */}
             <div>
-              <label>
-                {ledgerDraft.type === "Deposit"
-                  ? "Amount deposited (₹)"
-                  : ledgerDraft.withdrawalUse === "stock"
-                    ? "Amount withdrawn / deposited (₹)"
-                    : "Amount withdrawn (₹)"}
-              </label>
+              <label>Note / Purpose</label>
               <input
-                type="number"
-                placeholder="e.g. 500000"
-                className="mono"
-                value={ledgerDraft.amount}
-                onChange={e => setLedgerDraft(prev => ({ ...prev, amount: e.target.value }))}
-                style={{ fontSize: 18, fontWeight: 700 }}
-              />
-            </div>
-
-            {/* When Stock Investment is selected: Comprehensive Stock Details Card */}
-            {ledgerDraft.type === "Withdrawal" && ledgerDraft.withdrawalUse === "stock" && (
-              <div style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--color-gold-border)",
-                borderRadius: 12,
-                padding: 16,
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    Stock Investment Details
-                  </div>
-                  <span style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 4,
-                    background: "var(--color-gold-soft)", color: "var(--color-gold)", fontWeight: 700
-                  }}>AUTO-SYNCED TO HOLDINGS</span>
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 14 }}>
-                  Record and review the investment — input company name and research notes whenever you review this holding
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-                  <div>
-                    <label>Company name</label>
-                    <input
-                      placeholder="e.g. Reliance Industries"
-                      value={ledgerDraft.stockDetails?.companyName || ""}
-                      onChange={e => updateLedgerStockDetail("companyName", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Stock symbol</label>
-                    <input
-                      placeholder="e.g. RELIANCE"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.stock || ""}
-                      onChange={e => updateLedgerStockDetail("stock", e.target.value.toUpperCase())}
-                    />
-                  </div>
-                  <div>
-                    <label>Exchange</label>
-                    <select
-                      value={ledgerDraft.stockDetails?.exchange || "NSE"}
-                      onChange={e => updateLedgerStockDetail("exchange", e.target.value)}
-                    >
-                      <option>NSE</option>
-                      <option>BSE</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label>Quantity</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 100"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.qty || ""}
-                      onChange={e => updateLedgerStockDetail("qty", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Purchase price / share (₹)</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      placeholder="e.g. 2450.50"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.buyPrice || ""}
-                      onChange={e => updateLedgerStockDetail("buyPrice", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Current price / share (₹)</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      placeholder="defaults to purchase price"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.currentPrice || ""}
-                      onChange={e => updateLedgerStockDetail("currentPrice", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Price updated on</label>
-                    <input
-                      type="date"
-                      value={ledgerDraft.stockDetails?.priceUpdatedOn || ""}
-                      onChange={e => updateLedgerStockDetail("priceUpdatedOn", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>P/E ratio</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="e.g. 22.5"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.peRatio || ""}
-                      onChange={e => updateLedgerStockDetail("peRatio", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Beta</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="e.g. 1.25"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.beta || ""}
-                      onChange={e => updateLedgerStockDetail("beta", e.target.value)}
-                    />
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                      1.20 or above is shown as high beta
-                    </div>
-                  </div>
-                  <div>
-                    <label>Company size</label>
-                    <select
-                      value={ledgerDraft.stockDetails?.companySize || "Large cap"}
-                      onChange={e => updateLedgerStockDetail("companySize", e.target.value)}
-                    >
-                      <option>Large cap</option>
-                      <option>Mid cap</option>
-                      <option>Small cap</option>
-                      <option>Micro cap</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label>Valuation view</label>
-                    <select
-                      value={ledgerDraft.stockDetails?.valuationView || "Needs review"}
-                      onChange={e => updateLedgerStockDetail("valuationView", e.target.value)}
-                    >
-                      <option>Needs review</option>
-                      <option>Undervalued</option>
-                      <option>Fair</option>
-                      <option>Overvalued</option>
-                    </select>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                      Nudge P/E against the company's sector and history
-                    </div>
-                  </div>
-                  <div>
-                    <label>Next dividend / ex-date (optional)</label>
-                    <input
-                      type="date"
-                      value={ledgerDraft.stockDetails?.dividendDate || ""}
-                      onChange={e => updateLedgerStockDetail("dividendDate", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>Dividend per share (₹) (optional)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      placeholder="e.g. 10"
-                      className="mono"
-                      value={ledgerDraft.stockDetails?.dividendPerShare || ""}
-                      onChange={e => updateLedgerStockDetail("dividendPerShare", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>News date (optional)</label>
-                    <input
-                      type="date"
-                      value={ledgerDraft.stockDetails?.newsDate || ""}
-                      onChange={e => updateLedgerStockDetail("newsDate", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                  <label>Latest news / investment note (optional)</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Earnings, order win, management change, thesis..."
-                    value={ledgerDraft.stockDetails?.investmentNote || ""}
-                    onChange={e => updateLedgerStockDetail("investmentNote", e.target.value)}
-                    style={{ resize: "vertical" }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Optional Notes */}
-            <div>
-              <label>Notes (optional)</label>
-              <input
-                placeholder={ledgerDraft.type === "Deposit" ? "e.g. Opening capital, fresh deposit" : "e.g. Payout, thesis"}
+                placeholder={ledgerDraft.type === "Deposit" ? "e.g. Bank transfer, fresh trading capital" : "e.g. Profit payout, personal expense"}
                 value={ledgerDraft.note}
                 onChange={e => setLedgerDraft(prev => ({ ...prev, note: e.target.value }))}
               />
@@ -1760,42 +1640,43 @@ export default function Dashboard() {
             <button
               onClick={addLedger}
               style={{
-                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-                border: "none", color: "#0F172A",
+                background: ledgerDraft.type === "Deposit" ? "linear-gradient(135deg, #10B981 0%, #059669 100%)" : "linear-gradient(135deg, #F43F5E 0%, #E11D48 100%)",
+                border: "none", color: "#FFFFFF",
                 borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
+                boxShadow: ledgerDraft.type === "Deposit" ? "0 2px 8px rgba(16, 185, 129, 0.3)" : "0 2px 8px rgba(244, 63, 94, 0.3)"
               }}
             >
-              {editingLedgerId ? "Update Entry" : "Save Entry"}
+              {editingLedgerId ? "Update Entry" : (ledgerDraft.type === "Deposit" ? "Add Capital" : "Record Withdrawal")}
             </button>
           </div>
         </ModalWrapper>
       )}
 
-      {/* Modal: Holding Form */}
+      {/* Modal: Holding Form (Multi-Part Accumulation) */}
       {showHoldingForm && (
         <ModalWrapper
           onClose={cancelHoldingForm}
-          title={editingHoldingId ? "Edit Stock Holding" : "New Equity Investment"}
-          subtitle="Record and review the investment — input company details and research metrics"
+          title={editingHoldingId ? "Edit Stock Position" : "New Equity Investment"}
+          subtitle="Record accumulation purchases with multiple dates and prices to track true XIRR & average cost"
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* 1. Basic Company Details */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-              <div>
-                <label>Company Name</label>
-                <input
-                  placeholder="e.g. Reliance Industries"
-                  value={holdingDraft.companyName}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, companyName: e.target.value }))}
-                />
-              </div>
               <div>
                 <label>Stock Symbol</label>
                 <input
-                  placeholder="e.g. RELIANCE"
+                  placeholder="e.g. BSE"
                   className="mono"
                   value={holdingDraft.stock}
                   onChange={e => setHoldingDraft(prev => ({ ...prev, stock: e.target.value.toUpperCase() }))}
+                />
+              </div>
+              <div>
+                <label>Company Name</label>
+                <input
+                  placeholder="e.g. Bombay Stock Exchange"
+                  value={holdingDraft.companyName}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, companyName: e.target.value }))}
                 />
               </div>
               <div>
@@ -1806,37 +1687,239 @@ export default function Dashboard() {
                 >
                   <option>NSE</option>
                   <option>BSE</option>
+                  <option>UNLISTED</option>
                 </select>
               </div>
               <div>
-                <label>Purchase Date</label>
-                <input
-                  type="date"
-                  value={holdingDraft.date}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, date: e.target.value }))}
-                />
+                <label>Company Size</label>
+                <select
+                  value={holdingDraft.companySize}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, companySize: e.target.value }))}
+                >
+                  <option>Large cap</option>
+                  <option>Mid cap</option>
+                  <option>Small cap</option>
+                  <option>Micro cap</option>
+                </select>
               </div>
               <div>
-                <label>Quantity</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 100"
-                  className="mono"
-                  value={holdingDraft.qty}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, qty: e.target.value }))}
-                />
+                <label>Valuation View</label>
+                <select
+                  value={holdingDraft.valuationView}
+                  onChange={e => setHoldingDraft(prev => ({ ...prev, valuationView: e.target.value }))}
+                >
+                  <option>Needs review</option>
+                  <option>Undervalued</option>
+                  <option>Fair</option>
+                  <option>Overvalued</option>
+                </select>
               </div>
-              <div>
-                <label>Buy Price / Share (₹)</label>
-                <input
-                  type="number"
-                  step="0.05"
-                  placeholder="e.g. 2450.50"
-                  className="mono"
-                  value={holdingDraft.buyPrice}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, buyPrice: e.target.value }))}
-                />
+            </div>
+
+            {/* 2. Purchase Parts / Tranches Accumulation Section */}
+            <div style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 10,
+              padding: 16,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Purchase Parts / Tranches ({holdingDraft.tranches?.length || 1})
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                    Buying in parts? Add each purchase date, quantity, and buy price
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHoldingDraft(prev => ({
+                      ...prev,
+                      tranches: [
+                        ...(prev.tranches || []),
+                        emptyTranche(todayLocalISO())
+                      ]
+                    }));
+                  }}
+                  style={{
+                    background: "rgba(229, 184, 105, 0.15)",
+                    border: "1px solid var(--color-gold-border)",
+                    color: "var(--color-gold)",
+                    borderRadius: 6,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4
+                  }}
+                >
+                  <Plus size={13} /> + Add Another Part
+                </button>
               </div>
+
+              {/* List of Tranches */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {(holdingDraft.tranches || []).map((tranche, idx) => {
+                  const partCost = (Number(tranche.qty) || 0) * (Number(tranche.buyPrice) || 0);
+                  return (
+                    <div
+                      key={tranche.id || idx}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr)) 34px",
+                        gap: 10,
+                        alignItems: "center",
+                        background: "var(--bg-input)",
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border-input)"
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+                          Part #{idx + 1} Date
+                        </div>
+                        <input
+                          type="date"
+                          value={tranche.date}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setHoldingDraft(prev => ({
+                              ...prev,
+                              tranches: prev.tranches.map((t, i) => i === idx ? { ...t, date: val } : t)
+                            }));
+                          }}
+                          style={{ padding: "6px 8px", fontSize: 12, minHeight: 34 }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+                          Shares (Qty)
+                        </div>
+                        <input
+                          type="number"
+                          placeholder="e.g. 50"
+                          className="mono"
+                          value={tranche.qty}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setHoldingDraft(prev => ({
+                              ...prev,
+                              tranches: prev.tranches.map((t, i) => i === idx ? { ...t, qty: val } : t)
+                            }));
+                          }}
+                          style={{ padding: "6px 8px", fontSize: 12, minHeight: 34 }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+                          Buy Price (₹)
+                        </div>
+                        <input
+                          type="number"
+                          step="0.05"
+                          placeholder="e.g. 4200"
+                          className="mono"
+                          value={tranche.buyPrice}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setHoldingDraft(prev => ({
+                              ...prev,
+                              tranches: prev.tranches.map((t, i) => i === idx ? { ...t, buyPrice: val } : t)
+                            }));
+                          }}
+                          style={{ padding: "6px 8px", fontSize: 12, minHeight: 34 }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 3 }}>
+                          <span>Note</span>
+                          {partCost > 0 && <span className="mono" style={{ color: "var(--color-gold)", fontWeight: 700 }}>₹{partCost.toLocaleString('en-IN')}</span>}
+                        </div>
+                        <input
+                          placeholder="e.g. Initial buy, averaged on dip"
+                          value={tranche.note || ""}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setHoldingDraft(prev => ({
+                              ...prev,
+                              tranches: prev.tranches.map((t, i) => i === idx ? { ...t, note: val } : t)
+                            }));
+                          }}
+                          style={{ padding: "6px 8px", fontSize: 12, minHeight: 34 }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        {(holdingDraft.tranches || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHoldingDraft(prev => ({
+                                ...prev,
+                                tranches: prev.tranches.filter((_, i) => i !== idx)
+                              }));
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--color-loss-text)",
+                              cursor: "pointer",
+                              padding: 6,
+                              marginTop: 14
+                            }}
+                            title="Remove this purchase part"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Accumulated Preview */}
+              {(() => {
+                let totalQ = 0;
+                let totalInv = 0;
+                (holdingDraft.tranches || []).forEach(t => {
+                  const q = Number(t.qty) || 0;
+                  const p = Number(t.buyPrice) || 0;
+                  totalQ += q;
+                  totalInv += (q * p);
+                });
+                const avgP = totalQ > 0 ? totalInv / totalQ : 0;
+                return (
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 12,
+                    padding: "8px 12px",
+                    background: "rgba(229, 184, 105, 0.08)",
+                    border: "1px dashed var(--color-gold-border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    flexWrap: "wrap",
+                    gap: 8
+                  }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Accumulation Summary:</span>
+                    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                      <span>Total Shares: <strong className="mono" style={{ color: "var(--text-main)" }}>{totalQ}</strong></span>
+                      <span>Avg Buy Price: <strong className="mono" style={{ color: "var(--text-main)" }}>₹{avgP.toFixed(2)}</strong></span>
+                      <span>Total Invested: <strong className="mono" style={{ color: "var(--color-gold)" }}>{fmtINR(totalInv)}</strong></span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 3. Current Market Price (CMP) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <label style={{ margin: 0 }}>Current Price / Share (₹)</label>
@@ -1871,7 +1954,7 @@ export default function Dashboard() {
                       alignItems: "center",
                       gap: 3,
                     }}
-                    title="Fetch live market price for this stock"
+                    title="Fetch live market price"
                   >
                     ⚡ Fetch Price
                   </button>
@@ -1879,12 +1962,13 @@ export default function Dashboard() {
                 <input
                   type="number"
                   step="0.05"
-                  placeholder="defaults to buy price"
+                  placeholder="Defaults to average buy price"
                   className="mono"
                   value={holdingDraft.currentPrice}
                   onChange={e => setHoldingDraft(prev => ({ ...prev, currentPrice: e.target.value }))}
                 />
               </div>
+
               <div>
                 <label>Price Updated On</label>
                 <input
@@ -1893,6 +1977,10 @@ export default function Dashboard() {
                   onChange={e => setHoldingDraft(prev => ({ ...prev, priceUpdatedOn: e.target.value }))}
                 />
               </div>
+            </div>
+
+            {/* 4. Fundamentals & Thesis */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
               <div>
                 <label>P/E Ratio</label>
                 <input
@@ -1914,39 +2002,9 @@ export default function Dashboard() {
                   value={holdingDraft.beta}
                   onChange={e => setHoldingDraft(prev => ({ ...prev, beta: e.target.value }))}
                 />
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                  1.20 or above is shown as high beta
-                </div>
               </div>
               <div>
-                <label>Company Size</label>
-                <select
-                  value={holdingDraft.companySize}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, companySize: e.target.value }))}
-                >
-                  <option>Large cap</option>
-                  <option>Mid cap</option>
-                  <option>Small cap</option>
-                  <option>Micro cap</option>
-                </select>
-              </div>
-              <div>
-                <label>Valuation View</label>
-                <select
-                  value={holdingDraft.valuationView}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, valuationView: e.target.value }))}
-                >
-                  <option>Needs review</option>
-                  <option>Undervalued</option>
-                  <option>Fair</option>
-                  <option>Overvalued</option>
-                </select>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                  Nudge P/E against the company's sector and history
-                </div>
-              </div>
-              <div>
-                <label>Next Dividend / Ex-Date (Optional)</label>
+                <label>Next Dividend / Ex-Date</label>
                 <input
                   type="date"
                   value={holdingDraft.dividendDate}
@@ -1954,67 +2012,38 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <label>Dividend Per Share (₹) (Optional)</label>
+                <label>Dividend Per Share (₹)</label>
                 <input
                   type="number"
                   step="0.5"
-                  placeholder="e.g. 10"
+                  placeholder="e.g. 15"
                   className="mono"
                   value={holdingDraft.dividendPerShare}
                   onChange={e => setHoldingDraft(prev => ({ ...prev, dividendPerShare: e.target.value }))}
                 />
               </div>
-              <div>
-                <label>News Date (Optional)</label>
-                <input
-                  type="date"
-                  value={holdingDraft.newsDate}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, newsDate: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label>Total Invested</label>
-                <div className="mono" style={{ padding: "10px 14px", borderRadius: 8, background: "var(--bg-elevated)", fontWeight: 700, fontSize: 16, color: "var(--color-gold)" }}>
-                  {fmtINR((Number(holdingDraft.qty) || 0) * (Number(holdingDraft.buyPrice) || 0))}
-                </div>
-              </div>
             </div>
 
             <div>
-              <label>Latest News / Investment Note (Optional)</label>
+              <label>Latest News / Investment Thesis Notes (Optional)</label>
               <textarea
                 rows={2}
-                placeholder="Earnings, order win, management change, thesis..."
+                placeholder="Key growth catalysts, quarterly earnings, order wins, management updates..."
                 value={holdingDraft.investmentNote}
                 onChange={e => setHoldingDraft(prev => ({ ...prev, investmentNote: e.target.value }))}
                 style={{ resize: "vertical" }}
               />
             </div>
-
-            {!editingHoldingId && (
-              <label style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-                background: "var(--bg-elevated)", borderRadius: 8, cursor: "pointer",
-                border: "1px solid var(--border-subtle)", textTransform: "none", fontSize: 13, color: "var(--text-main)", margin: 0
-              }}>
-                <input
-                  type="checkbox"
-                  style={{ width: 16, height: 16, accentColor: "var(--color-gold)", minHeight: "auto" }}
-                  checked={holdingDraft.deductFromTradingCapital}
-                  onChange={e => setHoldingDraft(prev => ({ ...prev, deductFromTradingCapital: e.target.checked }))}
-                />
-                Deduct from trading capital (record movement in Capital Ledger)
-              </label>
-            )}
           </div>
 
+          {/* Action Buttons */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22, flexWrap: "wrap", gap: 10 }}>
             <div>
               {editingHoldingId && (
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm("Are you sure you want to delete this stock investment position?")) {
+                    if (confirm("Are you sure you want to delete this entire stock investment position?")) {
                       deleteHolding(editingHoldingId);
                     }
                   }}
@@ -2057,9 +2086,125 @@ export default function Dashboard() {
                   boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
                 }}
               >
-                {editingHoldingId ? "Update Holding" : "Save Holding"}
+                {editingHoldingId ? "Update Position" : "Save Investment"}
               </button>
             </div>
+          </div>
+        </ModalWrapper>
+      )}
+
+      {/* Modal: Quick Add Purchase Part / Tranche */}
+      {showQuickPartModal && (
+        <ModalWrapper
+          onClose={() => {
+            setShowQuickPartModal(false);
+            setQuickPartHoldingId(null);
+          }}
+          title={`Add Purchase Part — ${holdings.find(h => h.id === quickPartHoldingId)?.stock || "Stock"}`}
+          subtitle="Record another accumulation tranche with its date and buy price"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label>Purchase Date</label>
+                <input
+                  type="date"
+                  value={quickPartDraft.date}
+                  onChange={e => setQuickPartDraft(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Shares (Quantity)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 25"
+                  className="mono"
+                  value={quickPartDraft.qty}
+                  onChange={e => setQuickPartDraft(prev => ({ ...prev, qty: e.target.value }))}
+                  style={{ fontSize: 16, fontWeight: 700 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label>Buy Price / Share (₹)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  placeholder="e.g. 4350"
+                  className="mono"
+                  value={quickPartDraft.buyPrice}
+                  onChange={e => setQuickPartDraft(prev => ({ ...prev, buyPrice: e.target.value }))}
+                  style={{ fontSize: 16, fontWeight: 700 }}
+                />
+              </div>
+              <div>
+                <label>Tranche Note (Optional)</label>
+                <input
+                  placeholder="e.g. Dip buy, quarterly SIP"
+                  value={quickPartDraft.note}
+                  onChange={e => setQuickPartDraft(prev => ({ ...prev, note: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Tranche Preview */}
+            {(() => {
+              const q = Number(quickPartDraft.qty) || 0;
+              const p = Number(quickPartDraft.buyPrice) || 0;
+              const cost = q * p;
+              return (
+                <div style={{
+                  padding: "12px 14px",
+                  background: "var(--bg-elevated)",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Capital Deployed for this Part:</span>
+                  <span className="mono" style={{ fontSize: 16, fontWeight: 800, color: "var(--color-gold)" }}>
+                    {fmtINR(cost)}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+            <button
+              onClick={() => {
+                setShowQuickPartModal(false);
+                setQuickPartHoldingId(null);
+              }}
+              style={{
+                background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)",
+                borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer"
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                if (!quickPartDraft.qty || !quickPartDraft.buyPrice) {
+                  alert("Please enter both Quantity and Buy Price for this purchase part.");
+                  return;
+                }
+                await saveQuickPart(quickPartHoldingId, quickPartDraft);
+                setShowQuickPartModal(false);
+                setQuickPartHoldingId(null);
+              }}
+              style={{
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                border: "none", color: "#0F172A",
+                borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
+              }}
+            >
+              Add Purchase Part
+            </button>
           </div>
         </ModalWrapper>
       )}
@@ -2478,159 +2623,302 @@ function TradesTab({ trades, totalTrades, search, setSearch, indexFilter, setInd
   );
 }
 
-// Capital & Ledger Tab Component
-function CapitalTab({ startingCapital, setStartingCapital, ledger, stats, openNewLedgerForm, startEditLedger, deleteLedger }) {
+// Capital & Ledger Tab Component (Strictly Cash Movements: Deposits & Withdrawals)
+function CapitalTab({
+  startingCapital,
+  setStartingCapital,
+  ledger,
+  stats,
+  openNewDepositModal,
+  openNewWithdrawModal,
+  startEditLedger,
+  deleteLedger,
+}) {
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <div className="glass-card" style={{ padding: 16 }}>
-          <label>Starting Capital (₹)</label>
-          <input
-            type="number" className="mono" value={startingCapital}
-            onChange={e => setStartingCapital(Number(e.target.value) || 0)}
-            style={{ fontSize: 18, fontWeight: 700 }}
-          />
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* 1. Top Capital Metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
+        <div className="glass-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 8 }}>
+            Starting Capital
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "var(--text-muted)" }}>₹</span>
+            <input
+              type="number"
+              className="mono"
+              value={startingCapital}
+              onChange={e => setStartingCapital(Number(e.target.value) || 0)}
+              style={{
+                fontSize: 20,
+                fontWeight: 800,
+                background: "transparent",
+                border: "none",
+                borderBottom: "1.5px dashed var(--border-subtle)",
+                color: "var(--text-main)",
+                width: "100%",
+                outline: "none",
+                padding: "2px 0",
+              }}
+              title="Click to edit initial account capital"
+            />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+            Base trading balance
+          </div>
         </div>
-        <MetricSummaryCard label="Total Deposits" value={fmtINR(stats.deposits)} icon={<Wallet size={16} />} customColor="var(--color-win-text)" />
-        <MetricSummaryCard label="Cash Withdrawn" value={fmtINR(stats.cashWithdrawn)} icon={<ArrowDownToLine size={16} />} customColor="var(--color-loss-text)" />
-        <MetricSummaryCard label="Moved into Stocks" value={fmtINR(stats.movedIntoStocks)} icon={<PiggyBank size={16} />} customColor="var(--color-gold)" />
-        <MetricSummaryCard label="Net Capital Added" value={fmtINR(stats.netCapitalAdded)} icon={<Target size={16} />} />
+
+        <MetricSummaryCard
+          label="Total Deposits (Added)"
+          value={fmtINR(stats.deposits)}
+          icon={<ArrowDownLeft size={16} />}
+          customColor="var(--color-win-text)"
+        />
+
+        <MetricSummaryCard
+          label="Total Withdrawals (Out)"
+          value={fmtINR(stats.withdrawals)}
+          icon={<ArrowUpRight size={16} />}
+          customColor="var(--color-loss-text)"
+        />
+
+        <MetricSummaryCard
+          label="Net Capital Movement"
+          value={fmtSigned(stats.netCapitalAdded)}
+          icon={<Target size={16} />}
+          customColor={stats.netCapitalAdded >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"}
+        />
+
+        <MetricSummaryCard
+          label="Current Trading Capital"
+          value={fmtINR(stats.currentCapital)}
+          icon={<Briefcase size={16} />}
+          customColor="var(--color-gold)"
+        />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      {/* 2. Header Bar with Pure Action Buttons */}
+      <div
+        className="glass-card"
+        style={{
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 14,
+        }}
+      >
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-main)" }}>
-            Capital Ledger History ({ledger.length})
+          <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
+            Trading Capital Ledger ({ledger.length})
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-            Deposits, cash withdrawals, and capital allocated into equity investments
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+            Dedicated cash ledger tracking capital injections and account withdrawals
           </div>
         </div>
-        <button
-          onClick={openNewLedgerForm}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-            color: "#0F172A", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
-          }}
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          Add Entry
-        </button>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={openNewDepositModal}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 10px rgba(16, 185, 129, 0.25)",
+            }}
+          >
+            <ArrowDownLeft size={16} strokeWidth={2.5} />
+            + Add Capital (Deposit)
+          </button>
+
+          <button
+            onClick={openNewWithdrawModal}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 10px rgba(239, 68, 68, 0.25)",
+            }}
+          >
+            <ArrowUpRight size={16} strokeWidth={2.5} />
+            - Withdraw Capital
+          </button>
+        </div>
       </div>
 
-      {/* Mobile View: Ledger Cards */}
+      {/* 3. Mobile View: Ledger Cards */}
       <div className="mobile-only" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {[...ledger].reverse().map(l => {
-          const isDeposit = l.type === "Deposit";
-          const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
-          const movementLabel = isDeposit ? "Deposit" : isStock ? "Stock investment" : "Cash withdrawal";
-          const useLabel = isDeposit ? "Trading capital" : isStock ? (l.stockSymbol ? `Stock: ${l.stockSymbol}` : "Stock investment") : "Personal cash";
-          const amountSign = isDeposit ? "+" : "-";
-          const amountColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
-          const badgeBg = isDeposit ? "var(--color-win-soft)" : isStock ? "var(--color-gold-soft)" : "var(--color-loss-soft)";
-          const badgeColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+        {ledger.length === 0 ? (
+          <div className="glass-card" style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
+            No capital movements recorded yet.
+          </div>
+        ) : (
+          [...ledger].reverse().map(l => {
+            const isDeposit = l.type === "Deposit";
+            const amountSign = isDeposit ? "+" : "-";
+            const amountColor = isDeposit ? "var(--color-win-text)" : "var(--color-loss-text)";
+            const badgeBg = isDeposit ? "var(--color-win-soft)" : "var(--color-loss-soft)";
+            const badgeBorder = isDeposit ? "var(--color-win-border)" : "var(--color-loss-border)";
+            const badgeColor = isDeposit ? "var(--color-win-text)" : "var(--color-loss-text)";
 
-          return (
-            <div key={l.id} className="glass-card" style={{ padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmtDate(l.date)}</span>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                    background: badgeBg, color: badgeColor
-                  }}>{movementLabel}</span>
+            return (
+              <div key={l.id} className="glass-card" style={{ padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmtDate(l.date)}</span>
+                    <span style={{
+                      padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: badgeBg, border: `1px solid ${badgeBorder}`, color: badgeColor
+                    }}>
+                      {isDeposit ? "Deposit" : "Withdrawal"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4, cursor: "pointer" }}><Pencil size={14} /></button>
+                    {deleteConfirmId === l.id ? (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button
+                          onClick={() => { deleteLedger(l.id); setDeleteConfirmId(null); }}
+                          style={{ background: "var(--color-loss)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 6px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: "2px 4px", cursor: "pointer" }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setDeleteConfirmId(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4, cursor: "pointer" }}><Trash2 size={14} /></button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", padding: 4 }}><Pencil size={14} /></button>
-                  <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", padding: 4 }}><Trash2 size={14} /></button>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div className="mono" style={{ fontSize: 18, fontWeight: 800, color: amountColor }}>
+                    {amountSign}{fmtINR(l.amount)}
+                  </div>
                 </div>
+
+                {l.note && (
+                  <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 6, borderTop: "1px solid var(--border-subtle)", paddingTop: 6 }}>
+                    {l.note}
+                  </div>
+                )}
               </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: amountColor }}>
-                  {amountSign}{fmtINR(l.amount)}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
-                  {useLabel}
-                </div>
-              </div>
-
-              {l.note && (
-                <div style={{ fontSize: 11.5, color: "var(--text-muted)", fontStyle: "italic", marginTop: 4, borderTop: "1px solid var(--border-subtle)", paddingTop: 6 }}>
-                  {l.note}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
-      {/* Desktop View: Ledger Table */}
+      {/* 4. Desktop View: Pure Cash Ledger Table */}
       <div className="desktop-only glass-card" style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
-              {["Date", "Movement", "Use", "Notes", "Net Amount", ""].map(h => (
-                <th key={h} style={{ padding: "12px 14px", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+              {["Date", "Movement Type", "Amount", "Note / Purpose", "Actions"].map(h => (
+                <th key={h} style={{ padding: "12px 16px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {[...ledger].reverse().map(l => {
-              const isDeposit = l.type === "Deposit";
-              const isStock = l.type === "Investment" || l.withdrawalUse === "stock" || Boolean(l.stockSymbol);
-              const movementLabel = isDeposit ? "Deposit" : isStock ? "Stock investment" : "Cash withdrawal";
-              const useLabel = isDeposit ? "Trading capital" : isStock ? (l.stockSymbol ? `Stock: ${l.stockSymbol}` : "Stock investment") : "Personal cash";
-              const amountSign = isDeposit ? "+" : "-";
-              const amountColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
-              const badgeBg = isDeposit ? "var(--color-win-soft)" : isStock ? "var(--color-gold-soft)" : "var(--color-loss-soft)";
-              const badgeColor = isDeposit ? "var(--color-win-text)" : isStock ? "var(--color-gold)" : "var(--color-loss-text)";
+            {ledger.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>
+                  No capital movements recorded yet. Click "+ Add Capital" or "- Withdraw Capital" above to begin.
+                </td>
+              </tr>
+            ) : (
+              [...ledger].reverse().map(l => {
+                const isDeposit = l.type === "Deposit";
+                const amountSign = isDeposit ? "+" : "-";
+                const amountColor = isDeposit ? "var(--color-win-text)" : "var(--color-loss-text)";
+                const badgeBg = isDeposit ? "var(--color-win-soft)" : "var(--color-loss-soft)";
+                const badgeBorder = isDeposit ? "var(--color-win-border)" : "var(--color-loss-border)";
+                const badgeColor = isDeposit ? "var(--color-win-text)" : "var(--color-loss-text)";
 
-              return (
-                <tr key={l.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                  <td className="mono" style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{fmtDate(l.date)}</td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <span style={{
-                      padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                      background: badgeBg, color: badgeColor
-                    }}>{movementLabel}</span>
-                  </td>
-                  <td style={{ padding: "11px 14px", fontWeight: 600, color: "var(--text-main)" }}>{useLabel}</td>
-                  <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{l.note || "—"}</td>
-                  <td className="mono" style={{ padding: "11px 14px", fontWeight: 700, color: amountColor }}>
-                    {amountSign}{fmtINR(l.amount)}
-                  </td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => startEditLedger(l)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }} title="Edit"><Pencil size={14} /></button>
-                      <button onClick={() => deleteLedger(l.id)} style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer" }} title="Delete"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                return (
+                  <tr key={l.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                    <td className="mono" style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>{fmtDate(l.date)}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: badgeBg, border: `1px solid ${badgeBorder}`, color: badgeColor
+                      }}>
+                        {isDeposit ? "Deposit (Add Capital)" : "Withdrawal (Capital Out)"}
+                      </span>
+                    </td>
+                    <td className="mono" style={{ padding: "12px 16px", fontWeight: 800, fontSize: 14, color: amountColor, whiteSpace: "nowrap" }}>
+                      {amountSign}{fmtINR(l.amount)}
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "var(--text-main)" }}>
+                      {l.note || <span style={{ color: "var(--text-muted)" }}>—</span>}
+                    </td>
+                    <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <button
+                          onClick={() => startEditLedger(l)}
+                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+                          title="Edit Capital Entry"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        {deleteConfirmId === l.id ? (
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <button
+                              onClick={() => { deleteLedger(l.id); setDeleteConfirmId(null); }}
+                              style={{ background: "var(--color-loss)", color: "#fff", border: "none", borderRadius: 4, padding: "3px 7px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 4, cursor: "pointer" }}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(l.id)}
+                            style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 4 }}
+                            title="Delete Entry"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
     </div>
   );
-}
-
-function calcHoldingXIRR(dateStr, invested, curVal) {
-  if (!dateStr || invested <= 0 || curVal <= 0) return null;
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (isNaN(d.getTime())) return null;
-  const days = Math.max(1, (now - d) / (1000 * 60 * 60 * 24));
-  if (days < 5) {
-    return ((curVal - invested) / invested) * 100;
-  }
-  const ratio = curVal / invested;
-  const annualRate = (Math.pow(ratio, 365 / days) - 1) * 100;
-  if (!isFinite(annualRate) || isNaN(annualRate)) return null;
-  return annualRate;
 }
 
 // Inline input for editable holding metrics (with debounced / blur save and visual feedback)
@@ -2693,7 +2981,7 @@ function InlineHoldingInput({ initialValue, onSave, prefix, placeholder, min, st
   );
 }
 
-// Equity Investments Tab Component
+// Equity Investments Tab Component with Multi-Part Accumulation, Absolute Cost & Live XIRR
 function InvestmentsTab({
   holdings,
   stats,
@@ -2701,6 +2989,8 @@ function InvestmentsTab({
   startEditHolding,
   deleteHolding,
   updateHoldingField,
+  openQuickPartModal,
+  deleteHoldingTranche,
   fetchHoldingLiveCMP,
   fetchAllLiveCMPs,
   fetchingQuotes,
@@ -2709,8 +2999,18 @@ function InvestmentsTab({
   const [search, setSearch] = useState("");
   const [capFilter, setCapFilter] = useState("ALL");
   const [valFilter, setValFilter] = useState("ALL");
+  const [expandedIds, setExpandedIds] = useState(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [fetchingId, setFetchingId] = useState(null);
+
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleFetchOne = async (id) => {
     setFetchingId(id);
@@ -2721,7 +3021,7 @@ function InvestmentsTab({
   const totalInvested = stats?.holdingsInvested || 0;
   const totalCurVal = stats?.holdingsCurrentValue || 0;
   const totalUnrealized = stats?.holdingsUnrealized || 0;
-  const totalReturnPct = totalInvested > 0 ? (totalUnrealized / totalInvested) * 100 : 0;
+  const totalReturnPct = stats?.holdingsReturnPct || 0;
   const portfolioXIRR = stats?.equityXIRR ?? null;
 
   // Filtered holdings
@@ -2745,7 +3045,8 @@ function InvestmentsTab({
     if (totalInvested <= 0) return { large: 0, mid: 0, small: 0, other: 0 };
     let large = 0, mid = 0, small = 0, other = 0;
     holdings.forEach(h => {
-      const cost = (Number(h.qty) || 0) * (Number(h.buyPrice) || 0);
+      const m = getHoldingMetrics(h);
+      const cost = m.totalInvested;
       const cap = h.companySize || "Large cap";
       if (cap.toLowerCase().includes("large")) large += cost;
       else if (cap.toLowerCase().includes("mid")) mid += cost;
@@ -2765,7 +3066,7 @@ function InvestmentsTab({
       {/* 1. Top Portfolio Metric Summary Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         <MetricSummaryCard
-          label="Total Equity Invested"
+          label="Total Absolute Invested"
           value={fmtINR(totalInvested)}
           icon={<Briefcase size={16} />}
           customColor="var(--color-gold)"
@@ -2784,11 +3085,16 @@ function InvestmentsTab({
         />
         <MetricSummaryCard
           label="Portfolio Equity XIRR %"
-          value={fmtPct(portfolioXIRR)}
+          value={portfolioXIRR !== null ? `${fmtPct(portfolioXIRR)} p.a.` : "—"}
           isPnl
           val={portfolioXIRR}
           icon={<Percent size={16} />}
           customColor={portfolioXIRR >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"}
+        />
+        <MetricSummaryCard
+          label="Active Holdings & Parts"
+          value={`${holdings.length} stocks · ${stats.totalTranchesCount || holdings.length} parts`}
+          icon={<Layers size={16} />}
         />
       </div>
 
@@ -2805,7 +3111,7 @@ function InvestmentsTab({
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)" }}>
-                Equity Portfolio Strategy & Allocation
+                Equity Portfolio Strategy & Multi-Part Accumulation
               </span>
               <span
                 style={{
@@ -2821,14 +3127,14 @@ function InvestmentsTab({
                 100% FUNDED BY PROFITS
               </span>
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 640 }}>
-              All holdings below are permanent equity investments created from disciplined options trading withdrawals. Holding-level <strong>XIRR %</strong> tracks your true annualized compounding velocity from trade settlement to date.
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 680 }}>
+              Independent equity portfolio tracking multi-part accumulations on separate dates. Holding-level <strong>XIRR %</strong> tracks exact money-weighted compounding across all purchase dates up to today's live market value.
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ textAlign: "right", marginRight: 6 }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Portfolio Return</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Overall Return</div>
               <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color: totalUnrealized >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                 {fmtPct(totalReturnPct)}
               </div>
@@ -2966,7 +3272,7 @@ function InvestmentsTab({
         </div>
       </div>
 
-      {/* 4. Mobile Cards: Descriptive Holding Cards */}
+      {/* 4. Mobile View: Descriptive Holding Cards */}
       <div className="mobile-only" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {filteredHoldings.length === 0 ? (
           <div className="glass-card" style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
@@ -2974,14 +3280,8 @@ function InvestmentsTab({
           </div>
         ) : (
           filteredHoldings.map(h => {
-            const qty = Number(h.qty) || 0;
-            const buy = Number(h.buyPrice) || 0;
-            const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
-            const invested = qty * buy;
-            const curVal = qty * cp;
-            const pnl = curVal - invested;
-            const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-            const holdingXIRR = calcHoldingXIRR(h.date, invested, curVal);
+            const m = getHoldingMetrics(h);
+            const isExpanded = expandedIds.has(h.id);
             const daysHeld = h.date ? Math.max(0, Math.round((new Date() - new Date(h.date)) / (1000 * 60 * 60 * 24))) : 0;
 
             return (
@@ -2994,11 +3294,6 @@ function InvestmentsTab({
                       <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-elevated)", color: "var(--color-gold)", fontWeight: 700 }}>
                         {h.exchange || "NSE"}
                       </span>
-                      {h.companySize && (
-                        <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-elevated)", color: "var(--text-secondary)", fontWeight: 600 }}>
-                          {h.companySize}
-                        </span>
-                      )}
                       {h.valuationView && (
                         <span style={{
                           fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 700,
@@ -3016,29 +3311,45 @@ function InvestmentsTab({
                       </div>
                     )}
                     <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                      Purchased {fmtDate(h.date)} · {daysHeld} days held
+                      Purchased {fmtDate(h.date)} · {daysHeld}d held · {m.tranches.length} {m.tranches.length === 1 ? "part" : "parts"}
                     </div>
                   </div>
 
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <button
+                      onClick={() => openQuickPartModal(h.id)}
+                      style={{
+                        background: "rgba(16, 185, 129, 0.12)",
+                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                        color: "var(--color-win-text)",
+                        padding: "5px 9px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                      title="Add another accumulation tranche / part"
+                    >
+                      + Part
+                    </button>
                     <button
                       onClick={() => startEditHolding(h)}
                       style={{
                         background: "var(--color-gold-soft)",
                         border: "1px solid var(--color-gold-border)",
                         color: "var(--color-gold)",
-                        padding: "6px 12px",
-                        fontSize: 12,
+                        padding: "5px 10px",
+                        fontSize: 11,
                         fontWeight: 700,
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 5,
+                        gap: 4,
                         borderRadius: 6,
                         cursor: "pointer",
                       }}
                       title="Edit Full Investment Details"
                     >
-                      <Pencil size={13} /> Edit
+                      <Pencil size={12} /> Edit
                     </button>
                     {deleteConfirmId === h.id ? (
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -3052,14 +3363,13 @@ function InvestmentsTab({
                             color: "#FFFFFF",
                             border: "none",
                             borderRadius: 6,
-                            padding: "6px 9px",
-                            fontSize: 11,
+                            padding: "5px 8px",
+                            fontSize: 10.5,
                             fontWeight: 700,
                             cursor: "pointer",
-                            whiteSpace: "nowrap"
                           }}
                         >
-                          Confirm Delete?
+                          Confirm
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(null)}
@@ -3070,9 +3380,8 @@ function InvestmentsTab({
                             padding: 4,
                             cursor: "pointer"
                           }}
-                          title="Cancel"
                         >
-                          <X size={14} />
+                          ✕
                         </button>
                       </div>
                     ) : (
@@ -3082,11 +3391,9 @@ function InvestmentsTab({
                           background: "rgba(239, 68, 68, 0.1)",
                           border: "1px solid rgba(239, 68, 68, 0.25)",
                           color: "var(--color-loss-text)",
-                          padding: "6px 8px",
+                          padding: "5px 7px",
                           borderRadius: 6,
                           cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
                         }}
                         title="Delete Position"
                       >
@@ -3096,63 +3403,51 @@ function InvestmentsTab({
                   </div>
                 </div>
 
-                {/* Editable Metrics Grid */}
+                {/* Key Metrics Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 10, marginBottom: 12 }}>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Shares (Qty)</div>
-                    <InlineHoldingInput
-                      initialValue={h.qty}
-                      onSave={val => updateHoldingField(h.id, "qty", val)}
-                      min="1"
-                      step="1"
-                      width={85}
-                      placeholder="Qty"
-                      title="Edit Quantity directly (auto-saves)"
-                    />
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Total Shares</div>
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                      {m.totalQty}
+                    </div>
                   </div>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Buy Price (₹)</div>
-                    <InlineHoldingInput
-                      initialValue={h.buyPrice}
-                      onSave={val => updateHoldingField(h.id, "buyPrice", val)}
-                      prefix="₹"
-                      step="0.05"
-                      width={95}
-                      placeholder="Buy Price"
-                      title="Edit Buy Price directly (auto-saves)"
-                    />
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Avg Buy Price</div>
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                      {fmtINR(m.avgBuyPrice)}
+                    </div>
                   </div>
                   <div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Total Cost Basis</div>
-                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, marginTop: 4 }}>
-                      {fmtINR(invested)}
+                    <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Absolute Invested</div>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, color: "var(--color-gold)", marginTop: 2 }}>
+                      {fmtINR(m.totalInvested)}
                     </div>
                   </div>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Current Value</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 13, color: "var(--text-main)", marginTop: 4 }}>
-                      {fmtINR(curVal)}
+                    <div className="mono" style={{ fontWeight: 800, fontSize: 13, color: "var(--text-main)", marginTop: 2 }}>
+                      {fmtINR(m.currentValue)}
                     </div>
                   </div>
                   <div style={{ gridColumn: "span 2", paddingTop: 4, borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Unrealized P&L</span>
-                    <span className="mono" style={{ fontWeight: 800, fontSize: 13.5, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
-                      {fmtSigned(pnl)} ({fmtPct(pnlPct)})
+                    <span className="mono" style={{ fontWeight: 800, fontSize: 13.5, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                      {fmtSigned(m.pnl)} ({fmtPct(m.returnPct)})
                     </span>
                   </div>
                 </div>
 
-                {/* CMP Quick Updater + Individual Stock XIRR Badge */}
+                {/* CMP Quick Updater + Holding XIRR Badge */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(229, 184, 105, 0.05)", borderRadius: 10, border: "1px solid var(--border-subtle)", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 180px" }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>CMP:</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Live CMP:</span>
                     <InlineHoldingInput
-                      initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : h.buyPrice}
+                      initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : m.avgBuyPrice}
                       onSave={val => updateHoldingField(h.id, "currentPrice", val)}
                       prefix="₹"
                       step="0.05"
                       width={85}
-                      placeholder={String(buy)}
+                      placeholder={String(m.avgBuyPrice)}
                       title="Edit CMP directly (auto-saves)"
                     />
                     <button
@@ -3163,7 +3458,7 @@ function InvestmentsTab({
                         border: "1px solid var(--color-gold-border)",
                         color: "var(--color-gold)",
                         borderRadius: 6,
-                        padding: "6px 8px",
+                        padding: "5px 8px",
                         fontSize: 11,
                         fontWeight: 700,
                         cursor: fetchingId === h.id ? "wait" : "pointer",
@@ -3185,25 +3480,86 @@ function InvestmentsTab({
                       style={{
                         fontSize: 13.5,
                         fontWeight: 800,
-                        color: (holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
+                        color: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
                       }}
                     >
-                      {holdingXIRR !== null ? `${fmtPct(holdingXIRR)} p.a.` : "—"}
+                      {m.holdingXIRR !== null ? `${fmtPct(m.holdingXIRR)} p.a.` : "—"}
                     </div>
                   </div>
                 </div>
 
-                {/* Fundamentals: P/E, Beta, Dividend */}
-                {(h.peRatio || h.beta || h.dividendDate || h.dividendPerShare) && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--border-subtle)" }}>
-                    {h.peRatio && <span>P/E Ratio: <strong style={{ color: "var(--text-main)" }}>{h.peRatio}</strong></span>}
-                    {h.beta && <span>Beta: <strong style={{ color: "var(--text-main)" }}>{h.beta}</strong></span>}
-                    {h.dividendPerShare && <span>Div/Share: <strong style={{ color: "var(--color-win-text)" }}>₹{h.dividendPerShare}</strong></span>}
-                    {h.dividendDate && <span>Next Div: <strong style={{ color: "var(--text-main)" }}>{fmtDate(h.dividendDate)}</strong></span>}
-                  </div>
-                )}
+                {/* Purchase Parts Toggle & Drawer */}
+                <div style={{ marginBottom: 10 }}>
+                  <button
+                    onClick={() => toggleExpand(h.id)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--color-gold)",
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    {isExpanded ? "Hide Purchase Parts" : `View ${m.tranches.length} Purchase ${m.tranches.length === 1 ? "Part" : "Parts"}`}
+                  </button>
 
-                {/* Descriptive Investment Thesis & Catalyst Note */}
+                  {isExpanded && (
+                    <div style={{ marginTop: 8, background: "var(--bg-elevated)", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-subtle)", paddingBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+                          Accumulation Breakdown
+                        </span>
+                        <button
+                          onClick={() => openQuickPartModal(h.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--color-win-text)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          + Add Part
+                        </button>
+                      </div>
+
+                      {m.tranches.map((t, idx) => (
+                        <div key={t.id || idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0", borderBottom: "1px dashed var(--border-subtle)" }}>
+                          <div>
+                            <span style={{ fontWeight: 700, color: "var(--text-main)", marginRight: 6 }}>Part {idx + 1}:</span>
+                            <span className="mono" style={{ color: "var(--text-secondary)" }}>{fmtDate(t.date)}</span>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              {t.qty} shares @ ₹{t.buyPrice} {t.note ? `· ${t.note}` : ""}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className="mono" style={{ fontWeight: 700, color: "var(--text-main)" }}>
+                              {fmtINR((Number(t.qty) || 0) * (Number(t.buyPrice) || 0))}
+                            </span>
+                            {m.tranches.length > 1 && (
+                              <button
+                                onClick={() => deleteHoldingTranche(h.id, t.id)}
+                                style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 2 }}
+                                title="Delete this part"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Investment Thesis Note */}
                 {h.investmentNote && (
                   <div style={{ background: "var(--bg-elevated)", padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid var(--color-gold)" }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
@@ -3220,311 +3576,398 @@ function InvestmentsTab({
         )}
       </div>
 
-      {/* 5. Desktop View: Comprehensive Descriptive Holdings Table */}
+      {/* 5. Desktop View: Comprehensive Descriptive Holdings Table with Multi-Part Accumulation */}
       <div className="desktop-only glass-card" style={{ overflowX: "auto", border: "1px solid var(--border-card)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", textAlign: "left" }}>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Stock & Company</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Valuation View</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Purchase Date</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Qty</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Buy Price</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Total Invested</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Current Price (CMP)</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Valuation</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Accumulation</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Total Shares</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Avg Buy Price</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", color: "var(--color-gold)" }}>Absolute Invested</th>
+              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Live Price (CMP)</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Current Value</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Unrealized P&L</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>Return %</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", color: "var(--color-gold)" }}>Holding XIRR</th>
-              <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Fundamentals & Notes</th>
               <th style={{ padding: "12px 14px", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredHoldings.length === 0 ? (
               <tr>
-                <td colSpan={13} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>
-                  No equity investments match your filter criteria.
+                <td colSpan={12} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>
+                  No equity investments match your filter criteria. Click "+ Add Stock Investment" above to record one.
                 </td>
               </tr>
             ) : (
               filteredHoldings.map(h => {
-                const qty = Number(h.qty) || 0;
-                const buy = Number(h.buyPrice) || 0;
-                const cp = h.currentPrice !== "" && h.currentPrice != null ? Number(h.currentPrice) : buy;
-                const invested = qty * buy;
-                const curVal = qty * cp;
-                const pnl = curVal - invested;
-                const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-                const holdingXIRR = calcHoldingXIRR(h.date, invested, curVal);
+                const m = getHoldingMetrics(h);
+                const isExpanded = expandedIds.has(h.id);
                 const daysHeld = h.date ? Math.max(0, Math.round((new Date() - new Date(h.date)) / (1000 * 60 * 60 * 24))) : 0;
 
                 return (
-                  <tr key={h.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                    {/* Stock & Company */}
-                    <td style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <span className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
-                        <span style={{
-                          padding: "2px 5px", borderRadius: 4, fontSize: 10, fontWeight: 700,
-                          background: "var(--bg-elevated)", color: "var(--color-gold)"
-                        }}>{h.exchange || "NSE"}</span>
-                        <button
-                          onClick={() => startEditHolding(h)}
-                          style={{
-                            background: "rgba(229, 184, 105, 0.12)",
-                            border: "1px solid var(--color-gold-border)",
-                            color: "var(--color-gold)",
-                            padding: "2px 7px",
-                            borderRadius: 4,
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 3,
-                          }}
-                          title="Click to edit all fields (stock name, price, qty, notes)"
-                        >
-                          <Pencil size={10} /> Edit
-                        </button>
-                      </div>
-                      {h.companyName && h.companyName !== h.stock && (
-                        <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2, maxWidth: 180, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {h.companyName}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Valuation View */}
-                    <td style={{ padding: "12px 14px" }}>
-                      {h.valuationView ? (
-                        <span style={{
-                          padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                          background: h.valuationView === "Undervalued" ? "var(--color-win-soft)" : h.valuationView === "Overvalued" ? "var(--color-loss-soft)" : "rgba(245, 158, 11, 0.12)",
-                          color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)",
-                          border: `1px solid ${h.valuationView === "Undervalued" ? "var(--color-win-border)" : h.valuationView === "Overvalued" ? "var(--color-loss-border)" : "var(--color-gold-border)"}`,
-                        }}>
-                          {h.valuationView}
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
-                      )}
-                    </td>
-
-                    {/* Purchase Date & Age */}
-                    <td className="mono" style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
-                      <div>{fmtDate(h.date)}</div>
-                      <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{daysHeld}d held</div>
-                    </td>
-
-                    {/* Qty (Directly Editable) */}
-                    <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
-                      <InlineHoldingInput
-                        initialValue={h.qty}
-                        onSave={val => updateHoldingField(h.id, "qty", val)}
-                        min="1"
-                        step="1"
-                        width={60}
-                        placeholder="Qty"
-                        title="Edit Quantity directly (auto-saves)"
-                      />
-                    </td>
-
-                    {/* Buy Price (Directly Editable) */}
-                    <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
-                      <InlineHoldingInput
-                        initialValue={h.buyPrice}
-                        onSave={val => updateHoldingField(h.id, "buyPrice", val)}
-                        prefix="₹"
-                        step="0.05"
-                        width={75}
-                        placeholder="Price"
-                        title="Edit Buy Price directly (auto-saves)"
-                      />
-                    </td>
-
-                    {/* Total Invested */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700 }}>
-                      {fmtINR(invested)}
-                    </td>
-
-                    {/* Current Market Price (CMP) Inline Quick Updater & Live Button */}
-                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <InlineHoldingInput
-                          initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : h.buyPrice}
-                          onSave={val => updateHoldingField(h.id, "currentPrice", val)}
-                          prefix="₹"
-                          step="0.05"
-                          width={75}
-                          placeholder={String(buy)}
-                          title="Edit CMP directly (auto-saves)"
-                        />
-                        <button
-                          onClick={() => handleFetchOne(h.id)}
-                          disabled={fetchingId === h.id}
-                          style={{
-                            background: "rgba(229, 184, 105, 0.15)",
-                            border: "1px solid var(--color-gold-border)",
-                            color: "var(--color-gold)",
-                            borderRadius: 4,
-                            padding: "3px 6px",
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            cursor: fetchingId === h.id ? "wait" : "pointer",
-                            whiteSpace: "nowrap"
-                          }}
-                          title="Fetch real-time market price"
-                        >
-                          ⚡ {fetchingId === h.id ? "..." : "Live"}
-                        </button>
-                      </div>
-                      {h.priceUpdatedOn && (
-                        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                          Updated {fmtDate(h.priceUpdatedOn)}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Current Value */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-main)" }}>
-                      {fmtINR(curVal)}
-                    </td>
-
-                    {/* Unrealized P&L */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
-                      {fmtSigned(pnl)}
-                    </td>
-
-                    {/* Return % */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
-                      {fmtPct(pnlPct)}
-                    </td>
-
-                    {/* Individual Stock Holding XIRR % */}
-                    <td className="mono" style={{ padding: "12px 14px", textAlign: "right" }}>
-                      <div
-                        style={{
-                          display: "inline-block",
-                          padding: "3px 8px",
-                          borderRadius: 6,
-                          fontWeight: 800,
-                          fontSize: 12,
-                          background: (holdingXIRR || 0) >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
-                          color: (holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
-                          border: `1px solid ${(holdingXIRR || 0) >= 0 ? "var(--color-win-border)" : "var(--color-loss-border)"}`,
-                        }}
-                      >
-                        {holdingXIRR !== null ? `${fmtPct(holdingXIRR)}` : "—"}
-                      </div>
-                      <div style={{ fontSize: 9.5, color: "var(--text-muted)", marginTop: 2 }}>p.a.</div>
-                    </td>
-
-                    {/* Fundamentals & Research Thesis */}
-                    <td style={{ padding: "12px 14px", maxWidth: 220 }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, marginBottom: 3 }}>
-                        {h.peRatio && <span>P/E: <b>{h.peRatio}</b></span>}
-                        {h.beta && <span>Beta: <b>{h.beta}</b></span>}
-                        {h.dividendPerShare && <span style={{ color: "var(--color-win-text)" }}>Div: <b>₹{h.dividendPerShare}</b></span>}
-                      </div>
-                      {h.investmentNote ? (
-                        <div
-                          style={{
-                            fontSize: 11.5,
-                            color: "var(--text-secondary)",
-                            fontStyle: "italic",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                          title={h.investmentNote}
-                        >
-                          "{h.investmentNote}"
-                        </div>
-                      ) : (
-                        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>No thesis notes</span>
-                      )}
-                    </td>
-
-                    {/* Action Buttons */}
-                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                        <button
-                          onClick={() => startEditHolding(h)}
-                          style={{
-                            background: "var(--color-gold-soft)",
-                            border: "1px solid var(--color-gold-border)",
-                            color: "var(--color-gold)",
-                            padding: "6px 12px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 5,
-                            borderRadius: 6,
-                            cursor: "pointer",
-                          }}
-                          title="Edit Full Investment Details (Stock name, purchase price, qty, CMP, notes)"
-                        >
-                          <Pencil size={13} /> Edit
-                        </button>
-                        {deleteConfirmId === h.id ? (
-                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                            <button
-                              onClick={() => {
-                                deleteHolding(h.id);
-                                setDeleteConfirmId(null);
-                              }}
-                              style={{
-                                background: "var(--color-loss)",
-                                color: "#FFFFFF",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "4px 8px",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                whiteSpace: "nowrap"
-                              }}
-                            >
-                              Confirm Delete?
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(null)}
-                              style={{
-                                background: "transparent",
-                                border: "none",
-                                color: "var(--text-muted)",
-                                padding: "4px",
-                                cursor: "pointer"
-                              }}
-                              title="Cancel"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ) : (
+                  <React.Fragment key={h.id}>
+                    <tr style={{ borderTop: "1px solid var(--border-subtle)", background: isExpanded ? "rgba(229, 184, 105, 0.03)" : "transparent" }}>
+                      {/* Stock & Company */}
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                           <button
-                            onClick={() => setDeleteConfirmId(h.id)}
+                            onClick={() => toggleExpand(h.id)}
                             style={{
-                              background: "rgba(239, 68, 68, 0.1)",
-                              border: "1px solid rgba(239, 68, 68, 0.25)",
-                              color: "var(--color-loss-text)",
-                              padding: "6px 8px",
-                              borderRadius: 6,
+                              background: "none",
+                              border: "none",
+                              color: isExpanded ? "var(--color-gold)" : "var(--text-muted)",
                               cursor: "pointer",
-                              display: "inline-flex",
+                              padding: 0,
+                              display: "flex",
                               alignItems: "center",
                             }}
-                            title="Delete Position"
+                            title={isExpanded ? "Collapse parts breakdown" : "Expand parts breakdown"}
                           >
-                            <Trash2 size={13} />
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
+                          <span className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
+                          <span style={{
+                            padding: "2px 5px", borderRadius: 4, fontSize: 10, fontWeight: 700,
+                            background: "var(--bg-elevated)", color: "var(--color-gold)"
+                          }}>{h.exchange || "NSE"}</span>
+                        </div>
+                        {h.companyName && h.companyName !== h.stock && (
+                          <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2, paddingLeft: 22, maxWidth: 170, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {h.companyName}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+
+                      {/* Valuation View */}
+                      <td style={{ padding: "12px 14px" }}>
+                        {h.valuationView ? (
+                          <span style={{
+                            padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            background: h.valuationView === "Undervalued" ? "var(--color-win-soft)" : h.valuationView === "Overvalued" ? "var(--color-loss-soft)" : "rgba(245, 158, 11, 0.12)",
+                            color: h.valuationView === "Undervalued" ? "var(--color-win-text)" : h.valuationView === "Overvalued" ? "var(--color-loss-text)" : "var(--color-gold)",
+                            border: `1px solid ${h.valuationView === "Undervalued" ? "var(--color-win-border)" : h.valuationView === "Overvalued" ? "var(--color-loss-border)" : "var(--color-gold-border)"}`,
+                          }}>
+                            {h.valuationView}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Accumulation Tranches Badge */}
+                      <td style={{ padding: "12px 14px" }}>
+                        <button
+                          onClick={() => toggleExpand(h.id)}
+                          style={{
+                            background: isExpanded ? "var(--color-gold-soft)" : "var(--bg-elevated)",
+                            border: `1px solid ${isExpanded ? "var(--color-gold-border)" : "var(--border-subtle)"}`,
+                            color: isExpanded ? "var(--color-gold)" : "var(--text-main)",
+                            borderRadius: 6,
+                            padding: "3px 8px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                          title="Click to view all purchase dates and quantities"
+                        >
+                          <Layers size={12} />
+                          {m.tranches.length} {m.tranches.length === 1 ? "Part" : "Parts"}
+                        </button>
+                        <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 3 }}>
+                          {daysHeld}d held
+                        </div>
+                      </td>
+
+                      {/* Total Shares */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700 }}>
+                        {m.totalQty}
+                      </td>
+
+                      {/* Weighted Avg Buy Price */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700 }}>
+                        {fmtINR(m.avgBuyPrice)}
+                      </td>
+
+                      {/* Total Absolute Invested */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: "var(--color-gold)" }}>
+                        {fmtINR(m.totalInvested)}
+                      </td>
+
+                      {/* Live CMP with Direct Inline Editor and Live Refresh */}
+                      <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <InlineHoldingInput
+                            initialValue={h.currentPrice !== "" && h.currentPrice != null ? h.currentPrice : m.avgBuyPrice}
+                            onSave={val => updateHoldingField(h.id, "currentPrice", val)}
+                            prefix="₹"
+                            step="0.05"
+                            width={75}
+                            placeholder={String(m.avgBuyPrice)}
+                            title="Edit CMP directly (auto-saves)"
+                          />
+                          <button
+                            onClick={() => handleFetchOne(h.id)}
+                            disabled={fetchingId === h.id}
+                            style={{
+                              background: "rgba(229, 184, 105, 0.15)",
+                              border: "1px solid var(--color-gold-border)",
+                              color: "var(--color-gold)",
+                              borderRadius: 4,
+                              padding: "3px 6px",
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              cursor: fetchingId === h.id ? "wait" : "pointer",
+                              whiteSpace: "nowrap"
+                            }}
+                            title="Fetch real-time market price"
+                          >
+                            ⚡ {fetchingId === h.id ? "..." : "Live"}
+                          </button>
+                        </div>
+                        {h.priceUpdatedOn && (
+                          <div style={{ fontSize: 9.5, color: "var(--text-muted)", marginTop: 2 }}>
+                            {fmtDate(h.priceUpdatedOn)}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Current Value */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-main)" }}>
+                        {fmtINR(m.currentValue)}
+                      </td>
+
+                      {/* Unrealized P&L */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                        {fmtSigned(m.pnl)}
+                      </td>
+
+                      {/* Return % */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                        {fmtPct(m.returnPct)}
+                      </td>
+
+                      {/* Holding XIRR % */}
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right" }}>
+                        <div
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                            fontWeight: 800,
+                            fontSize: 12,
+                            background: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                            color: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
+                            border: `1px solid ${(m.holdingXIRR || 0) >= 0 ? "var(--color-win-border)" : "var(--color-loss-border)"}`,
+                          }}
+                        >
+                          {m.holdingXIRR !== null ? `${fmtPct(m.holdingXIRR)}` : "—"}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: "var(--text-muted)", marginTop: 2 }}>p.a.</div>
+                      </td>
+
+                      {/* Action Buttons */}
+                      <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          <button
+                            onClick={() => openQuickPartModal(h.id)}
+                            style={{
+                              background: "rgba(16, 185, 129, 0.12)",
+                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                              color: "var(--color-win-text)",
+                              padding: "4px 8px",
+                              borderRadius: 5,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                            title="Add another accumulation purchase part"
+                          >
+                            + Part
+                          </button>
+                          <button
+                            onClick={() => startEditHolding(h)}
+                            style={{
+                              background: "var(--color-gold-soft)",
+                              border: "1px solid var(--color-gold-border)",
+                              color: "var(--color-gold)",
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              borderRadius: 5,
+                              cursor: "pointer",
+                            }}
+                            title="Edit Full Investment Details"
+                          >
+                            <Pencil size={11} /> Edit
+                          </button>
+                          {deleteConfirmId === h.id ? (
+                            <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                              <button
+                                onClick={() => {
+                                  deleteHolding(h.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                style={{
+                                  background: "var(--color-loss)",
+                                  color: "#FFFFFF",
+                                  border: "none",
+                                  borderRadius: 4,
+                                  padding: "3px 6px",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap"
+                                }}
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "var(--text-muted)",
+                                  padding: "2px",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirmId(h.id)}
+                              style={{
+                                background: "rgba(239, 68, 68, 0.1)",
+                                border: "1px solid rgba(239, 68, 68, 0.25)",
+                                color: "var(--color-loss-text)",
+                                padding: "4px 6px",
+                                borderRadius: 5,
+                                cursor: "pointer",
+                              }}
+                              title="Delete Entire Position"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Expandable Multi-Part Breakdown Drawer */}
+                    {isExpanded && (
+                      <tr style={{ background: "rgba(229, 184, 105, 0.03)" }}>
+                        <td colSpan={12} style={{ padding: "12px 20px 16px 36px", borderTop: "1px dashed var(--border-subtle)" }}>
+                          <div style={{ background: "var(--bg-elevated)", borderRadius: 10, border: "1px solid var(--border-subtle)", padding: 14 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-gold)" }}>
+                                  Accumulation Tranches for {h.stock} ({m.tranches.length} {m.tranches.length === 1 ? "purchase" : "purchases"})
+                                </span>
+                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                  Each part has its own purchase date, shares &amp; cost contributing to holding XIRR
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => openQuickPartModal(h.id)}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  background: "rgba(16, 185, 129, 0.15)",
+                                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                                  color: "var(--color-win-text)",
+                                  borderRadius: 6,
+                                  padding: "5px 12px",
+                                  fontSize: 11.5,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Plus size={13} /> Add Accumulation Part
+                              </button>
+                            </div>
+
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                              <thead>
+                                <tr style={{ color: "var(--text-muted)", textAlign: "left", borderBottom: "1px solid var(--border-subtle)" }}>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase" }}>Part #</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase" }}>Purchase Date</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", textAlign: "right" }}>Shares (Qty)</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", textAlign: "right" }}>Buy Price</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", textAlign: "right" }}>Capital Invested</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase" }}>Notes</th>
+                                  <th style={{ padding: "6px 10px", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", textAlign: "center" }}>Action</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {m.tranches.map((t, idx) => {
+                                  const tCost = (Number(t.qty) || 0) * (Number(t.buyPrice) || 0);
+                                  return (
+                                    <tr key={t.id || idx} style={{ borderBottom: "1px dashed var(--border-subtle)" }}>
+                                      <td style={{ padding: "8px 10px", fontWeight: 700, color: "var(--text-main)" }}>
+                                        Part {idx + 1}
+                                      </td>
+                                      <td className="mono" style={{ padding: "8px 10px", color: "var(--text-secondary)" }}>
+                                        {fmtDate(t.date)}
+                                      </td>
+                                      <td className="mono" style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700 }}>
+                                        {t.qty}
+                                      </td>
+                                      <td className="mono" style={{ padding: "8px 10px", textAlign: "right" }}>
+                                        ₹{t.buyPrice}
+                                      </td>
+                                      <td className="mono" style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "var(--color-gold)" }}>
+                                        {fmtINR(tCost)}
+                                      </td>
+                                      <td style={{ padding: "8px 10px", color: "var(--text-secondary)", fontStyle: "italic" }}>
+                                        {t.note || "—"}
+                                      </td>
+                                      <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                        {m.tranches.length > 1 ? (
+                                          <button
+                                            onClick={() => deleteHoldingTranche(h.id, t.id)}
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: "var(--color-loss-text)",
+                                              cursor: "pointer",
+                                              padding: 3,
+                                            }}
+                                            title="Delete this purchase tranche"
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        ) : (
+                                          <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>Primary</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+
+                            {h.investmentNote && (
+                              <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--text-secondary)", fontStyle: "italic", borderTop: "1px solid var(--border-subtle)", paddingTop: 8 }}>
+                                <strong>Thesis Note:</strong> "{h.investmentNote}"
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
