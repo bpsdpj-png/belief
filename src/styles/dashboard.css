@@ -534,7 +534,8 @@ button:active {
   background: linear-gradient(135deg, #FDFBF7 0%, #E8DCC8 30%, #C6A75E 75%, #F5E8D0 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  font-weight: 900;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   display: inline-block;
 }
 
@@ -552,7 +553,8 @@ button:active {
   background: linear-gradient(135deg, #1F2A44 0%, #B08D3E 55%, #8C6A1F 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
 }
 
 [data-theme="light"] .daily-focus-banner {

@@ -1661,7 +1661,7 @@ export default function Dashboard() {
                   gap: 5,
                   color: "#FFFFFF",
                   fontSize: 10,
-                  fontWeight: 800,
+                  fontWeight: 650,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
@@ -1692,7 +1692,7 @@ export default function Dashboard() {
               border: `1px solid ${currentBharatActivity.accentColor}`,
               color: currentBharatActivity.accentColor,
               fontSize: 12,
-              fontWeight: 800,
+              fontWeight: 650,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 10,
@@ -1720,7 +1720,7 @@ export default function Dashboard() {
                 background: `linear-gradient(135deg, ${currentBharatActivity.accentColor}25 0%, var(--bg-elevated) 100%)`,
                 color: "var(--text-main)",
                 fontSize: 12.5,
-                fontWeight: 800,
+                fontWeight: 650,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -1774,20 +1774,20 @@ export default function Dashboard() {
               marginBottom: 16,
             }}>
               <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Today's P&L</div>
-                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: stats.todayPnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 650 }}>Today's P&L</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: stats.todayPnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                   {fmtSigned(stats.todayPnl)}
                 </div>
               </div>
               <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Discipline</div>
-                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: stats.discipline >= 80 ? "var(--color-win-text)" : "var(--color-gold)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 650 }}>Discipline</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: stats.discipline >= 80 ? "var(--color-win-text)" : "var(--color-gold)" }}>
                   {stats.discipline.toFixed(0)}%
                 </div>
               </div>
               <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Streak</div>
-                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: "var(--color-gold)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 650 }}>Streak</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: "var(--color-gold)" }}>
                   {stats.streak || 0}d
                 </div>
               </div>
@@ -1795,7 +1795,7 @@ export default function Dashboard() {
 
             {/* 7 Activity Selectors */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 480 }}>
-              <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontWeight: 650, textTransform: "uppercase" }}>
                 Switch Bharat's Activity / Pose:
               </span>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
@@ -1809,7 +1809,7 @@ export default function Dashboard() {
                         padding: "5px 10px",
                         borderRadius: 6,
                         fontSize: 11.5,
-                        fontWeight: isSelected ? 800 : 600,
+                        fontWeight: isSelected ? 700 : 500,
                         cursor: "pointer",
                         background: isSelected ? act.accentColor : "var(--bg-elevated)",
                         color: isSelected ? "#0F172A" : "var(--text-secondary)",
@@ -2442,7 +2442,7 @@ export default function Dashboard() {
                   alignItems: "center"
                 }}>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Capital Deployed for this Part:</span>
-                  <span className="mono" style={{ fontSize: 16, fontWeight: 800, color: "var(--color-gold)" }}>
+                  <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: "var(--color-gold)" }}>
                     {fmtINR(cost)}
                   </span>
                 </div>
@@ -2527,7 +2527,7 @@ function MetricSummaryCard({ label, value, icon, isPnl, val, customColor, subtex
           {icon}
         </div>
       </div>
-      <div className="mono" style={{ fontSize: 21, fontWeight: 800, color, letterSpacing: "-0.01em" }}>
+      <div className="mono" style={{ fontSize: 20, fontWeight: 700, color, letterSpacing: "0.01em" }}>
         {value}
       </div>
     </div>
@@ -3304,7 +3304,7 @@ function WeeklyPnLCard({ trades }) {
                 </span>
               )}
             </div>
-            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: thisWeekData ? (thisWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
+            <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: thisWeekData ? (thisWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
               {thisWeekData ? fmtSigned(thisWeekData.pnl) : "—"}
             </div>
             <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
@@ -3318,12 +3318,12 @@ function WeeklyPnLCard({ trades }) {
             border: prevWeekData ? (prevWeekData.pnl >= 0 ? "1px solid var(--color-win-border)" : "1px solid var(--color-loss-border)") : "1px solid var(--border-subtle)"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 10, fontWeight: 650, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.05em" }}>
                 Previous Week
               </span>
               {prevWeekData && (
                 <span style={{
-                  fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                  fontSize: 9, fontWeight: 650, padding: "1px 5px", borderRadius: 3,
                   background: prevWeekData.pnl >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
                   color: prevWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"
                 }}>
@@ -3331,7 +3331,7 @@ function WeeklyPnLCard({ trades }) {
                 </span>
               )}
             </div>
-            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: prevWeekData ? (prevWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
+            <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: prevWeekData ? (prevWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
               {prevWeekData ? fmtSigned(prevWeekData.pnl) : "—"}
             </div>
             <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
@@ -3374,7 +3374,7 @@ function WeeklyPnLCard({ trades }) {
                       <div style={{ fontWeight: 700, color: "var(--text-main)", marginBottom: 3 }}>
                         {d.label} {d.isThisWeek ? "(This Week)" : d.isPrevWeek ? "(Previous Week)" : ""}
                       </div>
-                      <div className="mono" style={{ fontSize: 13, fontWeight: 800, color: d.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginBottom: 4 }}>
+                      <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: d.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginBottom: 4 }}>
                         Net P&L: {fmtSigned(d.pnl)}
                       </div>
                       <div style={{ fontSize: 10.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
@@ -3871,8 +3871,8 @@ function CapitalTab({
               value={startingCapital}
               onChange={e => setStartingCapital(Number(e.target.value) || 0)}
               style={{
-                fontSize: 20,
-                fontWeight: 800,
+                fontSize: 19,
+                fontWeight: 700,
                 background: "transparent",
                 border: "none",
                 borderBottom: "1.5px dashed var(--border-subtle)",
@@ -3931,7 +3931,7 @@ function CapitalTab({
         }}
       >
         <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
             Trading Capital Ledger ({ledger.length})
           </div>
           <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
@@ -4035,7 +4035,7 @@ function CapitalTab({
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <div className="mono" style={{ fontSize: 18, fontWeight: 800, color: amountColor }}>
+                  <div className="mono" style={{ fontSize: 17, fontWeight: 700, color: amountColor }}>
                     {amountSign}{fmtINR(l.amount)}
                   </div>
                 </div>
@@ -4088,7 +4088,7 @@ function CapitalTab({
                         {isDeposit ? "Deposit (Add Capital)" : "Withdrawal (Capital Out)"}
                       </span>
                     </td>
-                    <td className="mono" style={{ padding: "12px 16px", fontWeight: 800, fontSize: 14, color: amountColor, whiteSpace: "nowrap" }}>
+                    <td className="mono" style={{ padding: "12px 16px", fontWeight: 700, fontSize: 14, color: amountColor, whiteSpace: "nowrap" }}>
                       {amountSign}{fmtINR(l.amount)}
                     </td>
                     <td style={{ padding: "12px 16px", color: "var(--text-main)" }}>
@@ -4192,7 +4192,7 @@ function InlineHoldingInput({ initialValue, onSave, prefix, placeholder, min, st
         }}
       />
       {saved && (
-        <span style={{ fontSize: 11, color: "var(--color-win-text)", fontWeight: 800, marginLeft: 2 }} title="Saved to cloud!">
+        <span style={{ fontSize: 11, color: "var(--color-win-text)", fontWeight: 700, marginLeft: 2 }} title="Saved to cloud!">
           ✓
         </span>
       )}
@@ -4329,7 +4329,7 @@ function InvestmentsTab({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)" }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
                 Equity Portfolio Strategy & Multi-Part Accumulation
               </span>
               <span
@@ -4354,7 +4354,7 @@ function InvestmentsTab({
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ textAlign: "right", marginRight: 6 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Overall Return</div>
-              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color: totalUnrealized >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, fontFamily: "var(--font-mono)", color: totalUnrealized >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                 {fmtPct(totalReturnPct)}
               </div>
             </div>
@@ -4509,7 +4509,7 @@ function InvestmentsTab({
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span className="mono" style={{ fontSize: 17, fontWeight: 800, color: "var(--color-gold)" }}>{h.stock}</span>
+                      <span className="mono" style={{ fontSize: 16.5, fontWeight: 700, color: "var(--color-gold)" }}>{h.stock}</span>
                       <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-elevated)", color: "var(--color-gold)", fontWeight: 700 }}>
                         {h.exchange || "NSE"}
                       </span>
@@ -4626,13 +4626,13 @@ function InvestmentsTab({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 10, marginBottom: 12 }}>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Total Shares</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
                       {m.totalQty}
                     </div>
                   </div>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>Avg Buy Price</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 14, color: "var(--text-main)", marginTop: 2 }}>
                       {fmtINR(m.avgBuyPrice)}
                     </div>
                   </div>
@@ -4644,13 +4644,13 @@ function InvestmentsTab({
                   </div>
                   <div>
                     <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Current Value</div>
-                    <div className="mono" style={{ fontWeight: 800, fontSize: 13, color: "var(--text-main)", marginTop: 2 }}>
+                    <div className="mono" style={{ fontWeight: 700, fontSize: 13, color: "var(--text-main)", marginTop: 2 }}>
                       {fmtINR(m.currentValue)}
                     </div>
                   </div>
                   <div style={{ gridColumn: "span 2", paddingTop: 4, borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Unrealized P&L</span>
-                    <span className="mono" style={{ fontWeight: 800, fontSize: 13.5, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                    <span className="mono" style={{ fontWeight: 700, fontSize: 13.5, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                       {fmtSigned(m.pnl)} ({fmtPct(m.returnPct)})
                     </span>
                   </div>
@@ -4698,7 +4698,7 @@ function InvestmentsTab({
                       className="mono"
                       style={{
                         fontSize: 13.5,
-                        fontWeight: 800,
+                        fontWeight: 700,
                         color: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",
                       }}
                     >
@@ -4848,7 +4848,7 @@ function InvestmentsTab({
                           >
                             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
-                          <span className="mono" style={{ fontWeight: 800, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
+                          <span className="mono" style={{ fontWeight: 700, fontSize: 14, color: "var(--color-gold)" }}>{h.stock}</span>
                           <span style={{
                             padding: "2px 5px", borderRadius: 4, fontSize: 10, fontWeight: 700,
                             background: "var(--bg-elevated)", color: "var(--color-gold)"
@@ -4915,7 +4915,7 @@ function InvestmentsTab({
                       </td>
 
                       {/* Total Absolute Invested */}
-                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: "var(--color-gold)" }}>
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: "var(--color-gold)" }}>
                         {fmtINR(m.totalInvested)}
                       </td>
 
@@ -4963,7 +4963,7 @@ function InvestmentsTab({
                       </td>
 
                       {/* Unrealized P&L */}
-                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 800, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                      <td className="mono" style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: m.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
                         {fmtSigned(m.pnl)}
                       </td>
 
@@ -4979,7 +4979,7 @@ function InvestmentsTab({
                             display: "inline-block",
                             padding: "3px 8px",
                             borderRadius: 6,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             fontSize: 12,
                             background: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
                             color: (m.holdingXIRR || 0) >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)",

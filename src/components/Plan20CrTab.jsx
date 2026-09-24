@@ -156,7 +156,7 @@ export default function Plan20CrTab({
               className="hero-plan-title"
               style={{
                 fontSize: "clamp(24px, 4vw, 34px)",
-                fontWeight: 800,
+                fontWeight: 700,
                 margin: "0 0 10px 0",
                 letterSpacing: "-0.02em",
                 background: "linear-gradient(135deg, #FFFFFF 40%, var(--color-gold) 100%)",
@@ -213,8 +213,8 @@ export default function Plan20CrTab({
               </div>
               <div
                 style={{
-                  fontSize: 24,
-                  fontWeight: 800,
+                  fontSize: 22,
+                  fontWeight: 700,
                   fontFamily: "var(--font-mono)",
                   color: "var(--color-win-text)",
                   display: "flex",
@@ -253,8 +253,8 @@ export default function Plan20CrTab({
               </div>
               <div
                 style={{
-                  fontSize: 24,
-                  fontWeight: 800,
+                  fontSize: 22,
+                  fontWeight: 700,
                   fontFamily: "var(--font-mono)",
                   color: "var(--color-loss-text)",
                   display: "flex",
@@ -460,8 +460,8 @@ export default function Plan20CrTab({
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 6 }}>
               <span
                 style={{
-                  fontSize: 44,
-                  fontWeight: 900,
+                  fontSize: 40,
+                  fontWeight: 700,
                   fontFamily: "var(--font-mono)",
                   color:
                     habitStats.overallScore >= 80 ? "var(--color-win-text)" : "var(--color-gold)",
@@ -623,7 +623,7 @@ export default function Plan20CrTab({
             <span
               style={{
                 fontSize: 18,
-                fontWeight: 800,
+                fontWeight: 700,
                 fontFamily: "var(--font-mono)",
                 color: "var(--color-win-text)",
               }}
@@ -817,8 +817,8 @@ export default function Plan20CrTab({
           </div>
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
+              fontSize: 21,
+              fontWeight: 700,
               fontFamily: "var(--font-mono)",
               color: "var(--text-main)",
             }}
@@ -843,8 +843,8 @@ export default function Plan20CrTab({
           </div>
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
+              fontSize: 21,
+              fontWeight: 700,
               fontFamily: "var(--font-mono)",
               color: "var(--color-win-text)",
             }}
@@ -869,8 +869,8 @@ export default function Plan20CrTab({
           </div>
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
+              fontSize: 21,
+              fontWeight: 700,
               fontFamily: "var(--font-mono)",
               color: "var(--color-gold)",
             }}
@@ -895,8 +895,8 @@ export default function Plan20CrTab({
           </div>
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
+              fontSize: 21,
+              fontWeight: 700,
               fontFamily: "var(--font-mono)",
               color: "var(--text-main)",
             }}
@@ -1105,7 +1105,7 @@ export default function Plan20CrTab({
                           padding: "12px 12px",
                           textAlign: "right",
                           fontFamily: "var(--font-mono)",
-                          fontWeight: 800,
+                          fontWeight: 700,
                           color: q.milestone ? "var(--color-gold)" : "var(--text-main)",
                           fontSize: q.milestone ? 14 : 13,
                         }}
@@ -1404,7 +1404,7 @@ export default function Plan20CrTab({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 16,
-                fontWeight: 800,
+                fontWeight: 700,
                 fontFamily: "var(--font-mono)",
                 flexShrink: 0,
               }}

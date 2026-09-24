@@ -159,12 +159,12 @@ export default function BharatAvatarCard({
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ fontSize: 18 }}>{currentActivity.emoji}</span>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
+            <h3 style={{ margin: 0, fontSize: 16.5, fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.01em" }}>
               Bharat • {currentActivity.name}
             </h3>
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: currentActivity.accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            {currentActivity.badge} • <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{modeLabel}</span>
+          <div style={{ fontSize: 11, fontWeight: 600, color: currentActivity.accentColor, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {currentActivity.badge} • <span style={{ color: "var(--text-secondary)", fontWeight: 450 }}>{modeLabel}</span>
           </div>
         </div>
 
@@ -387,7 +387,7 @@ export default function BharatAvatarCard({
             gap: 6,
             color: "#FFFFFF",
             fontSize: 10.5,
-            fontWeight: 800,
+            fontWeight: 650,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
@@ -420,7 +420,7 @@ export default function BharatAvatarCard({
               borderRadius: 20,
               color: "var(--color-win-text)",
               fontSize: 11.5,
-              fontWeight: 800,
+              fontWeight: 700,
               fontFamily: "var(--font-mono)",
               display: "inline-flex",
               alignItems: "center",
@@ -449,7 +449,7 @@ export default function BharatAvatarCard({
             gap: 6,
             color: "#FFFFFF",
             fontSize: 11.5,
-            fontWeight: 700,
+            fontWeight: 600,
             boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
           }}
         >
@@ -472,7 +472,7 @@ export default function BharatAvatarCard({
               borderRadius: 24,
               color: "#FFFFFF",
               fontSize: 12,
-              fontWeight: 800,
+              fontWeight: 650,
               whiteSpace: "nowrap",
               zIndex: 10,
               animation: "avatarLevitate 1s ease-in-out infinite",
@@ -494,7 +494,7 @@ export default function BharatAvatarCard({
           background: `linear-gradient(135deg, ${currentActivity.accentColor}25 0%, var(--bg-elevated) 100%)`,
           color: "var(--text-main)",
           fontSize: 13,
-          fontWeight: 800,
+          fontWeight: 650,
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
@@ -535,10 +535,10 @@ export default function BharatAvatarCard({
       >
         <Quote size={18} color={currentActivity.accentColor} style={{ flexShrink: 0, marginTop: 2, transform: "rotate(180deg)" }} />
         <div>
-          <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--text-main)", lineHeight: 1.45, fontWeight: 500 }}>
+          <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--text-main)", lineHeight: 1.45, fontWeight: 450 }}>
             "{currentActivity.quote}"
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 4, fontWeight: 600 }}>
+          <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 4, fontWeight: 550 }}>
             Context: {currentActivity.routineReason}
           </div>
         </div>
@@ -546,7 +546,7 @@ export default function BharatAvatarCard({
 
       {/* 7 Interactive Quick Pose Chips */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
           Switch Bharat's Activity:
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -560,7 +560,7 @@ export default function BharatAvatarCard({
                   padding: "4px 9px",
                   borderRadius: 8,
                   fontSize: 11,
-                  fontWeight: isSelected ? 800 : 600,
+                  fontWeight: isSelected ? 650 : 500,
                   cursor: "pointer",
                   display: "inline-flex",
                   alignItems: "center",

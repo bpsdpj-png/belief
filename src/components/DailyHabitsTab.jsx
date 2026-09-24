@@ -302,16 +302,17 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
             <h1
               className="habits-hero-title"
               style={{
-                fontSize: "clamp(22px, 3.5vw, 32px)",
-                fontWeight: 800,
+                fontSize: "clamp(22px, 3.5vw, 30px)",
+                fontWeight: 650,
                 margin: "0 0 10px 0",
-                lineHeight: 1.25,
+                lineHeight: 1.3,
+                letterSpacing: "-0.01em",
               }}
             >
               Before you command <span className="gold-text-accent">₹20 Crore</span>, Bharat, you must command yourself.
             </h1>
 
-            <p style={{ color: "var(--text-secondary)", fontSize: 14.5, margin: 0, maxWidth: 680, lineHeight: 1.6, fontWeight: 500 }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: 14.5, margin: 0, maxWidth: 680, lineHeight: 1.6, fontWeight: 450 }}>
               The market never bows to desire — it surrenders to discipline. Master your dawn, conquer volatility, and the empire becomes inevitable.
             </p>
           </div>
@@ -354,14 +355,14 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
               }}
             >
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   MIND & BODY RITUALS
                 </div>
-                <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: "var(--text-main)" }}>
-                  {todayHabitsCount} / 11 <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({todayHabitsPct}%)</span>
+                <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
+                  {todayHabitsCount} / 11 <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>({todayHabitsPct}%)</span>
                 </div>
               </div>
-              <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "rgba(198, 167, 94, 0.15)", color: "var(--color-gold)" }}>
+              <span style={{ fontSize: 9.5, fontWeight: 650, padding: "2px 6px", borderRadius: 4, background: "rgba(198, 167, 94, 0.15)", color: "var(--color-gold)" }}>
                 PILLAR 1
               </span>
             </div>
@@ -379,11 +380,11 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
               }}
             >
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 10, fontWeight: 650, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   TRADING SOP INTEGRITY
                 </div>
-                <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)" }}>
-                  {todaySopCount} / 5 <span style={{ fontSize: 11 }}>({isTodaySopHonored ? "100% HONORED ★" : `${todaySopPct}%`})</span>
+                <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)" }}>
+                  {todaySopCount} / 5 <span style={{ fontSize: 11, fontWeight: 500 }}>({isTodaySopHonored ? "100% HONORED ★" : `${todaySopPct}%`})</span>
                 </div>
               </div>
               <ShieldCheck size={18} color={isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)"} />
@@ -425,7 +426,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
             }}
           >
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 4px 0", color: "var(--text-main)" }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-main)" }}>
                 Process & Ritual Checklist
               </h2>
               <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
@@ -460,7 +461,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
           <div style={{ marginBottom: 28 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "var(--color-gold)", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 12, fontWeight: 650, letterSpacing: "0.08em", color: "var(--color-gold)", textTransform: "uppercase" }}>
                   PILLAR 1: MIND & BODY FOUNDATION
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
@@ -545,7 +546,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
           <div style={{ marginBottom: 24, paddingTop: 20, borderTop: "1px dashed var(--border-subtle)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "var(--color-win-text)", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 12, fontWeight: 650, letterSpacing: "0.08em", color: "var(--color-win-text)", textTransform: "uppercase" }}>
                   PILLAR 2: TRADING EXECUTION SOP (ANTI-1% SPIKE PROTOCOL)
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
@@ -592,7 +593,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                             className="mono"
                             style={{
                               fontSize: 11,
-                              fontWeight: 800,
+                              fontWeight: 700,
                               padding: "1px 6px",
                               borderRadius: 4,
                               background: isChecked ? "var(--color-win-soft)" : "var(--bg-card)",
@@ -726,13 +727,13 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                 border: isTodaySopHonored ? "1px solid var(--color-win-border)" : "1px solid var(--border-card)",
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 TRADING SOP INTEGRITY
               </div>
-              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", margin: "8px 0 4px 0" }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", margin: "8px 0 4px 0" }}>
                 {todaySopCount} / 5
               </div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--text-secondary)" }}>
+              <div style={{ fontSize: 11, fontWeight: 550, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--text-secondary)" }}>
                 {isTodaySopHonored ? "★ 100% Process Respected" : `${5 - todaySopCount} rule(s) pending`}
               </div>
             </div>
@@ -746,10 +747,10 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                 border: "1px solid var(--border-card)",
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 MIND & BODY RITUALS
               </div>
-              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
                 {todayHabitsCount} / 11
               </div>
               <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
@@ -766,10 +767,10 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                 border: "1px solid var(--border-card)",
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 CURRENT STREAK
               </div>
-              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-gold)", margin: "8px 0 4px 0" }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--color-gold)", margin: "8px 0 4px 0" }}>
                 {currentStreak}
               </div>
               <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
@@ -786,10 +787,10 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                 border: "1px solid var(--border-card)",
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 PERFECT DAYS
               </div>
-              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
                 {perfectDaysCount}
               </div>
               <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
@@ -820,7 +821,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
           }}
         >
           <div>
-            <h3 style={{ fontSize: 17, fontWeight: 800, margin: "0 0 4px 0", color: "var(--text-main)" }}>
+            <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-main)" }}>
               Last 14 days process audit
             </h3>
             <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -875,7 +876,7 @@ export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
                       {day.display}
                     </span>
                     {day.isSopHonored && (
-                      <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 3, background: "var(--color-win-soft)", color: "var(--color-win-text)" }}>
+                      <span style={{ fontSize: 9, fontWeight: 650, padding: "1px 5px", borderRadius: 3, background: "var(--color-win-soft)", color: "var(--color-win-text)" }}>
                         SOP ★
                       </span>
                     )}
