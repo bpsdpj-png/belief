@@ -2320,6 +2320,7 @@ function WeeklyPnLReview({ trades }) {
   }, [trades]);
 
   const defaultMonday = useMemo(() => getMondayIso(latestTradeDate), [latestTradeDate]);
+  const prevMonday = useMemo(() => shiftIsoDate(defaultMonday, -7), [defaultMonday]);
   const [selectedMonday, setSelectedMonday] = useState(defaultMonday);
 
   useEffect(() => {
@@ -2523,39 +2524,51 @@ function WeeklyPnLReview({ trades }) {
 
           {/* Week Stepper (Only active in "week" mode) */}
           {viewMode === "week" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <button
-                onClick={goPrev}
-                title="Previous Week"
-                className="btn-secondary"
-                style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
-              >
-                <ChevronLeft size={14} />
-                <span className="desktop-only">Prev</span>
-              </button>
-
-              <button
-                onClick={goLatest}
-                title="Jump to Latest Week"
+                onClick={() => setSelectedMonday(prevMonday)}
                 className="btn-secondary"
                 style={{
-                  padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
-                  color: selectedMonday === defaultMonday ? "var(--color-gold)" : "var(--text-muted)",
-                  borderColor: selectedMonday === defaultMonday ? "var(--color-gold-border)" : "var(--border-subtle)"
+                  padding: "5px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  color: selectedMonday === prevMonday ? "var(--color-gold)" : "var(--text-muted)",
+                  borderColor: selectedMonday === prevMonday ? "var(--color-gold-border)" : "var(--border-subtle)",
+                  background: selectedMonday === prevMonday ? "var(--color-gold-soft)" : "transparent"
                 }}
               >
-                Latest
+                ◀ Prev Week
               </button>
 
               <button
-                onClick={goNext}
-                title="Next Week"
+                onClick={() => setSelectedMonday(defaultMonday)}
                 className="btn-secondary"
-                style={{ padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+                style={{
+                  padding: "5px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  color: selectedMonday === defaultMonday ? "var(--color-gold)" : "var(--text-muted)",
+                  borderColor: selectedMonday === defaultMonday ? "var(--color-gold-border)" : "var(--border-subtle)",
+                  background: selectedMonday === defaultMonday ? "var(--color-gold-soft)" : "transparent"
+                }}
               >
-                <span className="desktop-only">Next</span>
-                <ChevronRight size={14} />
+                This Week ★
               </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button
+                  onClick={goPrev}
+                  title="Step 1 Week Back"
+                  className="btn-secondary"
+                  style={{ padding: "5px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  onClick={goNext}
+                  title="Step 1 Week Forward"
+                  className="btn-secondary"
+                  style={{ padding: "5px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2856,6 +2869,284 @@ function WeeklyPnLReview({ trades }) {
   );
 }
 
+// Weekly P&L Totals Component (Like Monthly P&L Bar Chart - All Weeks in Total)
+function WeeklyTotalsCard({ trades }) {
+  const [range, setRange] = useState("8"); // "8" | "12" | "all"
+
+  const getMondayIso = (dateOrIso) => {
+    const d = typeof dateOrIso === "string" ? new Date(dateOrIso + "T00:00:00") : new Date(dateOrIso);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return toLocalISODate(d);
+  };
+
+  const shiftIsoDate = (isoMonday, dayOffset) => {
+    const d = new Date(isoMonday + "T00:00:00");
+    d.setDate(d.getDate() + dayOffset);
+    return toLocalISODate(d);
+  };
+
+  const allWeeks = useMemo(() => {
+    if (!trades || trades.length === 0) return [];
+    const weeksMap = {};
+
+    trades.forEach(t => {
+      const mon = getMondayIso(t.date);
+      if (!weeksMap[mon]) {
+        const fri = shiftIsoDate(mon, 4);
+        weeksMap[mon] = {
+          monday: mon,
+          friday: fri,
+          gross: 0,
+          charges: 0,
+          net: 0,
+          tradesCount: 0,
+          dayNets: {}
+        };
+      }
+      const gross = Number(t.gross) || 0;
+      const charges = Number(t.charges) || 0;
+      const net = gross - charges;
+      weeksMap[mon].gross += gross;
+      weeksMap[mon].charges += charges;
+      weeksMap[mon].net += net;
+      weeksMap[mon].tradesCount += 1;
+      weeksMap[mon].dayNets[t.date] = (weeksMap[mon].dayNets[t.date] || 0) + net;
+    });
+
+    const sortedKeys = Object.keys(weeksMap).sort();
+    if (sortedKeys.length === 0) return [];
+
+    const thisWeekKey = sortedKeys[sortedKeys.length - 1];
+    const prevWeekKey = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : null;
+
+    return sortedKeys.map(k => {
+      const w = weeksMap[k];
+      const isThisWeek = k === thisWeekKey;
+      const isPrevWeek = k === prevWeekKey;
+
+      const mParts = w.monday.split("-");
+      const fParts = w.friday.split("-");
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const fMonth = months[parseInt(fParts[1], 10) - 1];
+
+      let label = `${parseInt(mParts[2], 10)}–${parseInt(fParts[2], 10)} ${fMonth}`;
+      let shortLabel = label;
+      if (isThisWeek) shortLabel += " (This Wk)";
+      else if (isPrevWeek) shortLabel += " (Prev Wk)";
+
+      let winDays = 0;
+      let lossDays = 0;
+      Object.values(w.dayNets).forEach(dn => {
+        if (dn > 0) winDays++;
+        else if (dn < 0) lossDays++;
+      });
+      const daysTraded = Object.keys(w.dayNets).length;
+
+      return {
+        key: k,
+        monday: w.monday,
+        friday: w.friday,
+        label,
+        shortLabel,
+        pnl: Math.round(w.net),
+        gross: Math.round(w.gross),
+        charges: Math.round(w.charges),
+        tradesCount: w.tradesCount,
+        daysTraded,
+        winDays,
+        lossDays,
+        winRate: daysTraded > 0 ? (winDays / daysTraded) * 100 : 0,
+        isThisWeek,
+        isPrevWeek,
+      };
+    });
+  }, [trades]);
+
+  const displayedWeeks = useMemo(() => {
+    if (range === "8") return allWeeks.slice(-8);
+    if (range === "12") return allWeeks.slice(-12);
+    return allWeeks;
+  }, [allWeeks, range]);
+
+  const thisWeekData = allWeeks.find(w => w.isThisWeek);
+  const prevWeekData = allWeeks.find(w => w.isPrevWeek);
+
+  return (
+    <div className="glass-card" style={{ padding: 18, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div>
+        {/* Header with Title and Range Switcher */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-main)" }}>
+                Weekly P&L (Total by Week)
+              </span>
+              <span style={{
+                fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+                background: "var(--color-gold-soft)", color: "var(--color-gold)", border: "1px solid var(--color-gold-border)",
+                textTransform: "uppercase"
+              }}>
+                Like Monthly
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+              Monday to Friday consolidated total profit or loss
+            </div>
+          </div>
+
+          {/* Range Pills */}
+          <div style={{ display: "flex", background: "var(--bg-elevated)", padding: 2, borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+            {[
+              ["8", "Last 8"],
+              ["12", "Last 12"],
+              ["all", "All"],
+            ].map(([val, lbl]) => (
+              <button
+                key={val}
+                onClick={() => setRange(val)}
+                style={{
+                  padding: "3px 9px", borderRadius: 5, fontSize: 10.5, fontWeight: 600, border: "none", cursor: "pointer",
+                  background: range === val ? "var(--bg-card)" : "transparent",
+                  color: range === val ? "var(--text-main)" : "var(--text-muted)",
+                  boxShadow: range === val ? "0 1px 3px rgba(0,0,0,0.12)" : "none"
+                }}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Highlights: This Week vs Previous Week in Total */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          {/* This Week Total */}
+          <div style={{
+            background: "var(--bg-elevated)", padding: "10px 12px", borderRadius: 8,
+            border: thisWeekData ? (thisWeekData.pnl >= 0 ? "1px solid var(--color-win-border)" : "1px solid var(--color-loss-border)") : "1px solid var(--border-subtle)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.05em" }}>
+                This Week Total
+              </span>
+              {thisWeekData && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                  background: thisWeekData.pnl >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                  color: thisWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"
+                }}>
+                  {thisWeekData.pnl >= 0 ? "PROFIT" : "LOSS"}
+                </span>
+              )}
+            </div>
+            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: thisWeekData ? (thisWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
+              {thisWeekData ? fmtSigned(thisWeekData.pnl) : "—"}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+              {thisWeekData ? `${thisWeekData.label} · ${thisWeekData.tradesCount} trades` : "No trades"}
+            </div>
+          </div>
+
+          {/* Previous Week Total */}
+          <div style={{
+            background: "var(--bg-elevated)", padding: "10px 12px", borderRadius: 8,
+            border: prevWeekData ? (prevWeekData.pnl >= 0 ? "1px solid var(--color-win-border)" : "1px solid var(--color-loss-border)") : "1px solid var(--border-subtle)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.05em" }}>
+                Previous Week Total
+              </span>
+              {prevWeekData && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                  background: prevWeekData.pnl >= 0 ? "var(--color-win-soft)" : "var(--color-loss-soft)",
+                  color: prevWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)"
+                }}>
+                  {prevWeekData.pnl >= 0 ? "PROFIT" : "LOSS"}
+                </span>
+              )}
+            </div>
+            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: prevWeekData ? (prevWeekData.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)") : "var(--text-muted)" }}>
+              {prevWeekData ? fmtSigned(prevWeekData.pnl) : "—"}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+              {prevWeekData ? `${prevWeekData.label} · ${prevWeekData.tradesCount} trades` : "No trades"}
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly Bar Chart (All Weeks like Monthly) */}
+        {displayedWeeks.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 30 }}>No weekly trades logged yet.</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={displayedWeeks} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+              <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fill: "var(--chart-axis)", fontSize: 9.5 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: "var(--chart-axis)", fontSize: 9.5 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`}
+                width={45}
+              />
+              <ReferenceLine y={0} stroke="var(--border-subtle)" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div style={{
+                      background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)",
+                      borderRadius: 8, padding: "8px 12px", fontSize: 11.5, minWidth: 170,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+                    }}>
+                      <div style={{ fontWeight: 700, color: "var(--text-main)", marginBottom: 3 }}>
+                        {d.label} {d.isThisWeek ? "(This Week)" : d.isPrevWeek ? "(Previous Week)" : ""}
+                      </div>
+                      <div className="mono" style={{ fontSize: 13, fontWeight: 800, color: d.pnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)", marginBottom: 4 }}>
+                        Net P&L: {fmtSigned(d.pnl)}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                        <span>Gross:</span>
+                        <span className="mono" style={{ color: "var(--text-main)" }}>{fmtINR(d.gross)}</span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                        <span>Brokerage:</span>
+                        <span className="mono" style={{ color: "var(--color-loss-text)" }}>-{fmtINR(d.charges)}</span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: "var(--text-muted)", display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+                        <span>Trades:</span>
+                        <span className="mono" style={{ color: "var(--text-main)" }}>{d.tradesCount} ({d.winDays}W / {d.lossDays}L)</span>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="pnl" radius={[4, 4, 4, 4]}>
+                {displayedWeeks.map((w, idx) => (
+                  <Cell
+                    key={idx}
+                    fill={w.pnl >= 0 ? "var(--color-win)" : "var(--color-loss)"}
+                    stroke={w.isThisWeek ? "var(--color-gold)" : (w.isPrevWeek ? "var(--border-card-hover)" : "none")}
+                    strokeWidth={w.isThisWeek || w.isPrevWeek ? 2 : 0}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Overview Tab Component
 function OverviewTab({ stats, targetPct, setTargetPct, trades }) {
   const dailyTarget = stats.currentCapital * (targetPct / 100);
@@ -2977,31 +3268,56 @@ function OverviewTab({ stats, targetPct, setTargetPct, trades }) {
         </div>
       </div>
 
-      {/* Row 3: Monthly P&L, Win/Loss, and Performance Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-        {/* Monthly P&L */}
-        <div className="glass-card" style={{ padding: 18 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-main)", marginBottom: 12 }}>
-            Monthly P&L
-          </div>
-          {stats.monthly.length === 0 ? <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 30 }}>No trades yet.</div> : (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={stats.monthly}>
-                <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: "var(--chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={m => m.slice(5)} />
-                <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} width={45} />
-                <ReferenceLine y={0} stroke="var(--border-subtle)" />
-                <Tooltip contentStyle={{ background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)", borderRadius: 8, fontSize: 12 }} formatter={v => [fmtINR(v), "P&L"]} />
-                <Bar dataKey="pnl" radius={[4, 4, 4, 4]}>
-                  {stats.monthly.map((m, i) => (
-                    <Cell key={i} fill={m.pnl >= 0 ? "var(--color-win)" : "var(--color-loss)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      {/* Row 3: Periodic Consolidated Reviews: Weekly P&L Totals & Monthly P&L Totals */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+        {/* Weekly P&L (Total by Week - All Weeks Mon–Fri) */}
+        <WeeklyTotalsCard trades={trades} />
 
+        {/* Monthly P&L (Total by Month) */}
+        <div className="glass-card" style={{ padding: 18, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-main)" }}>
+                  Monthly P&L (Total by Month)
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  Month-by-month consolidated trading performance
+                </div>
+              </div>
+              <span style={{
+                fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+                background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)",
+                textTransform: "uppercase"
+              }}>
+                Monthly
+              </span>
+            </div>
+
+            {stats.monthly.length === 0 ? (
+              <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 30 }}>No trades yet.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={stats.monthly} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: "var(--chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={m => m.slice(5)} />
+                  <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} width={45} />
+                  <ReferenceLine y={0} stroke="var(--border-subtle)" />
+                  <Tooltip contentStyle={{ background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)", borderRadius: 8, fontSize: 12 }} formatter={v => [fmtINR(v), "P&L"]} />
+                  <Bar dataKey="pnl" radius={[4, 4, 4, 4]}>
+                    {stats.monthly.map((m, i) => (
+                      <Cell key={i} fill={m.pnl >= 0 ? "var(--color-win)" : "var(--color-loss)"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Row 4: Win/Loss Distribution and Execution Quality */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
         {/* Win / Loss Donut */}
         <div className="glass-card" style={{ padding: 18 }}>
           <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-main)", marginBottom: 12 }}>
