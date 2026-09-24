@@ -27,6 +27,7 @@ import {
 } from "../services/dashboardService";
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
+import { BHARAT_ACTIVITIES, getBharatActivityById } from "../data/bharatAvatar";
 import "../styles/dashboard.css";
 
 const RULE_DEFS = [
@@ -596,30 +597,14 @@ export default function Dashboard() {
     };
   }, [trades, ledger, holdings, startingCapital, tradesSorted]);
 
-  // Avatar companion dynamic emotional states
+  // Avatar companion dynamic emotional states for Bharat
   const isAvatarHappy = stats.todayPnl > 0 && stats.discipline >= 80;
-  const autoAvatarSrc = isAvatarHappy ? "/avatars/avatar_happy.jpg" : "/avatars/avatar_zen.jpg";
-  const displayedAvatarSrc = avatarPreviewMode === "happy"
-    ? "/avatars/avatar_happy.jpg"
-    : avatarPreviewMode === "zen"
-    ? "/avatars/avatar_zen.jpg"
-    : autoAvatarSrc;
-
-  const avatarStateLabel = (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
-    ? "Ascended Master: Profit & Discipline"
-    : stats.todayPnl < 0 && stats.discipline >= 80
-    ? "Stoic Guardian: Capital Defended"
-    : stats.discipline < 80
-    ? "Vigilant Mentor: Discipline Focus"
-    : "Zen Yogi: Calm Inner Mastery";
-
-  const avatarQuoteMessage = (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
-    ? "Mind stilled. Capital expanded. You honored your rules, and compounding rewarded your execution today. Stay humble."
-    : stats.todayPnl < 0 && stats.discipline >= 80
-    ? "A planned stop-loss is the warrior's fee. Your capital was protected today. Return tomorrow at dawn with calm conviction."
-    : stats.discipline < 80
-    ? "The market gives warnings before it takes capital. Do not chase. Your ₹20 Crore empire is built on rules, not emotions."
-    : "Before you command ₹20 Crore, you must command yourself. Surya Namaskar and meditation prepare the vessel.";
+  const autoAvatarSrc = isAvatarHappy ? "/avatars/bharat_profit.jpg" : "/avatars/bharat_standing.jpg";
+  const currentBharatActivity = avatarPreviewMode
+    ? getBharatActivityById(avatarPreviewMode)
+    : isAvatarHappy
+    ? getBharatActivityById("profit")
+    : getBharatActivityById("standing");
 
   // Trade actions
   const addTrade = async () => {
@@ -1317,11 +1302,11 @@ export default function Dashboard() {
                 justifyContent: "center",
                 transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
-              title="Your Trading Companion Avatar (Click to view mood & wisdom)"
+              title="Bharat's Life & Mindset Companion (Click to view full-body poses & stats)"
             >
               <img
                 src={autoAvatarSrc}
-                alt="Avatar"
+                alt="Bharat Avatar"
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </button>
@@ -1440,7 +1425,7 @@ export default function Dashboard() {
         )}
 
         {tab === "habits" && (
-          <DailyHabitsTab />
+          <DailyHabitsTab todayPnl={stats.todayPnl} discipline={stats.discipline} />
         )}
 
         {tab === "discipline" && (
@@ -1617,27 +1602,26 @@ export default function Dashboard() {
         </ModalWrapper>
       )}
 
-      {/* Modal: Trader Avatar Companion */}
+      {/* Modal: Bharat's Full-Body Companion */}
       {showAvatarModal && (
-        <ModalWrapper onClose={() => { setShowAvatarModal(false); setAvatarPreviewMode(null); }} title="Your Trading Companion Avatar">
+        <ModalWrapper onClose={() => { setShowAvatarModal(false); setAvatarPreviewMode(null); }} title="Bharat's Life & Mindset Companion">
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "10px 0" }}>
-            {/* Avatar Artwork Frame */}
+            {/* Full-Body Avatar Artwork Frame */}
             <div style={{
-              width: 190,
-              height: 190,
-              borderRadius: "50%",
+              width: 240,
+              height: 320,
+              borderRadius: 16,
               overflow: "hidden",
-              border: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "4px solid var(--color-win)" : "4px solid var(--color-gold)",
-              boxShadow: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
-                ? "0 0 30px rgba(16, 185, 129, 0.35), 0 10px 24px rgba(0,0,0,0.25)"
-                : "0 0 30px rgba(198, 167, 94, 0.35), 0 10px 24px rgba(0,0,0,0.25)",
-              marginBottom: 16,
+              border: `3px solid ${currentBharatActivity.accentColor}`,
+              boxShadow: `0 0 30px ${currentBharatActivity.glowColor}, 0 10px 24px rgba(0,0,0,0.25)`,
+              marginBottom: 14,
               background: "var(--bg-card)",
+              position: "relative",
             }}>
               <img
-                src={displayedAvatarSrc}
-                alt="Zen Trader Avatar"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                src={currentBharatActivity.image}
+                alt={`Bharat - ${currentBharatActivity.name}`}
+                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
               />
             </div>
 
@@ -1648,34 +1632,37 @@ export default function Dashboard() {
               gap: 8,
               padding: "4px 14px",
               borderRadius: 20,
-              background: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win-soft)" : "var(--color-gold-soft)",
-              border: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "1px solid var(--color-win-border)" : "1px solid var(--color-gold-border)",
-              color: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win-text)" : "var(--color-gold)",
+              background: "var(--bg-elevated)",
+              border: `1px solid ${currentBharatActivity.accentColor}`,
+              color: currentBharatActivity.accentColor,
               fontSize: 12,
               fontWeight: 800,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              marginBottom: 12,
+              marginBottom: 10,
             }}>
-              <Sparkles size={13} />
-              {avatarStateLabel}
+              <span>{currentBharatActivity.emoji}</span>
+              <span>{currentBharatActivity.name}</span>
             </div>
 
             {/* Avatar Quote */}
             <div style={{
               maxWidth: 480,
-              fontSize: 14.5,
+              fontSize: 13.5,
               fontWeight: 600,
               lineHeight: 1.5,
               color: "var(--text-main)",
               fontStyle: "italic",
-              marginBottom: 16,
+              marginBottom: 14,
               background: "var(--bg-elevated)",
-              padding: "14px 20px",
+              padding: "12px 18px",
               borderRadius: 12,
               border: "1px solid var(--border-subtle)",
             }}>
-              "{avatarQuoteMessage}"
+              "{currentBharatActivity.quote}"
+              <div style={{ fontSize: 10.5, fontStyle: "normal", color: "var(--text-muted)", marginTop: 4, fontWeight: 500 }}>
+                Context: {currentBharatActivity.routineReason}
+              </div>
             </div>
 
             {/* State KPIs */}
@@ -1685,7 +1672,7 @@ export default function Dashboard() {
               gap: 10,
               width: "100%",
               maxWidth: 480,
-              marginBottom: 18,
+              marginBottom: 16,
             }}>
               <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Today's P&L</div>
@@ -1707,31 +1694,35 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Avatar Mode Preview Toggles */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Switch Mood:</span>
-              <button
-                onClick={() => setAvatarPreviewMode(avatarPreviewMode === "zen" ? null : "zen")}
-                style={{
-                  padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
-                  background: (avatarPreviewMode === "zen" || (!avatarPreviewMode && !isAvatarHappy)) ? "var(--color-gold)" : "var(--bg-elevated)",
-                  color: (avatarPreviewMode === "zen" || (!avatarPreviewMode && !isAvatarHappy)) ? "#121927" : "var(--text-secondary)",
-                  border: "1px solid var(--border-subtle)",
-                }}
-              >
-                🧘 Meditating Zen
-              </button>
-              <button
-                onClick={() => setAvatarPreviewMode(avatarPreviewMode === "happy" ? null : "happy")}
-                style={{
-                  padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
-                  background: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win)" : "var(--bg-elevated)",
-                  color: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "#FFFFFF" : "var(--text-secondary)",
-                  border: "1px solid var(--border-subtle)",
-                }}
-              >
-                ✨ Happy & Triumphant
-              </button>
+            {/* 7 Activity Selectors */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 480 }}>
+              <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                Switch Bharat's Activity / Pose:
+              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
+                {BHARAT_ACTIVITIES.map((act) => {
+                  const isSelected = currentBharatActivity.id === act.id;
+                  return (
+                    <button
+                      key={act.id}
+                      onClick={() => setAvatarPreviewMode(act.id)}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: 6,
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? 800 : 600,
+                        cursor: "pointer",
+                        background: isSelected ? act.accentColor : "var(--bg-elevated)",
+                        color: isSelected ? "#0F172A" : "var(--text-secondary)",
+                        border: isSelected ? `1px solid ${act.accentColor}` : "1px solid var(--border-subtle)",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {act.emoji} {act.short}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </ModalWrapper>

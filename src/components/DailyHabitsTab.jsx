@@ -17,6 +17,7 @@ import {
   loadDailyHabitsFromDb,
   persistDailyHabitToDb,
 } from "../services/dashboardService";
+import BharatAvatarCard from "./BharatAvatarCard";
 
 // Pillar 1: 11 Mind & Body Daily Rituals (Kept in strict order)
 export const HABIT_LIST = [
@@ -87,7 +88,7 @@ const formatDisplayDate = (iso) => {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 };
 
-export default function DailyHabitsTab() {
+export default function DailyHabitsTab({ todayPnl = 0, discipline = 100 }) {
   const todayISO = toISO(new Date());
   const [selectedDate, setSelectedDate] = useState(todayISO);
   const [habitsData, setHabitsData] = useState({});
@@ -307,7 +308,7 @@ export default function DailyHabitsTab() {
                 lineHeight: 1.25,
               }}
             >
-              Before you command <span className="gold-text-accent">₹20 Crore</span>, you must command yourself.
+              Before you command <span className="gold-text-accent">₹20 Crore</span>, Bharat, you must command yourself.
             </h1>
 
             <p style={{ color: "var(--text-secondary)", fontSize: 14.5, margin: 0, maxWidth: 680, lineHeight: 1.6, fontWeight: 500 }}>
@@ -330,11 +331,11 @@ export default function DailyHabitsTab() {
                 background: "var(--bg-card)",
                 transition: "all 0.3s ease",
               }}
-              title={isTodaySopHonored && todayHabitsCount >= 8 ? "Ascended Master: Discipline & Process Honored!" : "Zen Yogi: Meditating & Staying Centered"}
+              title={isTodaySopHonored && todayHabitsCount >= 8 ? "Bharat Ascended: Discipline & Process Honored!" : "Bharat: Centered & Poised"}
             >
               <img
-                src={isTodaySopHonored && todayHabitsCount >= 8 ? "/avatars/avatar_happy.jpg" : "/avatars/avatar_zen.jpg"}
-                alt="Zen Trader Avatar"
+                src={isTodaySopHonored && todayHabitsCount >= 8 ? "/avatars/bharat_profit.jpg" : "/avatars/bharat_standing.jpg"}
+                alt="Bharat Avatar"
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
@@ -396,7 +397,7 @@ export default function DailyHabitsTab() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(320px, 1fr) 320px",
+          gridTemplateColumns: "minmax(320px, 1fr) 380px",
           gap: 20,
           alignItems: "start",
         }}
@@ -705,85 +706,95 @@ export default function DailyHabitsTab() {
           </div>
         </div>
 
-        {/* Right: 4 KPI Cards (2x2 Grid) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {/* Card 1: Trading SOP Integrity */}
-          <div
-            className="glass-card"
-            style={{
-              padding: 16,
-              background: "var(--bg-card)",
-              border: isTodaySopHonored ? "1px solid var(--color-win-border)" : "1px solid var(--border-card)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              TRADING SOP INTEGRITY
-            </div>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", margin: "8px 0 4px 0" }}>
-              {todaySopCount} / 5
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--text-secondary)" }}>
-              {isTodaySopHonored ? "★ 100% Process Respected" : `${5 - todaySopCount} rule(s) pending`}
-            </div>
-          </div>
+        {/* Right: Bharat's Full-Body Avatar Card + 4 KPI Cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <BharatAvatarCard
+            habitsMap={todayHMap}
+            sopMap={todayHMap}
+            isTodaySopHonored={isTodaySopHonored}
+            todayPnl={todayPnl}
+          />
 
-          {/* Card 2: Mind & Body Rituals */}
-          <div
-            className="glass-card"
-            style={{
-              padding: 16,
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-card)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              MIND & BODY RITUALS
+          {/* 4 KPI Cards (2x2 Grid) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {/* Card 1: Trading SOP Integrity */}
+            <div
+              className="glass-card"
+              style={{
+                padding: 16,
+                background: "var(--bg-card)",
+                border: isTodaySopHonored ? "1px solid var(--color-win-border)" : "1px solid var(--border-card)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                TRADING SOP INTEGRITY
+              </div>
+              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--color-gold)", margin: "8px 0 4px 0" }}>
+                {todaySopCount} / 5
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: isTodaySopHonored ? "var(--color-win-text)" : "var(--text-secondary)" }}>
+                {isTodaySopHonored ? "★ 100% Process Respected" : `${5 - todaySopCount} rule(s) pending`}
+              </div>
             </div>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
-              {todayHabitsCount} / 11
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              {todayHabitsPct}% completed today
-            </div>
-          </div>
 
-          {/* Card 3: Current Streak */}
-          <div
-            className="glass-card"
-            style={{
-              padding: 16,
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-card)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              CURRENT STREAK
+            {/* Card 2: Mind & Body Rituals */}
+            <div
+              className="glass-card"
+              style={{
+                padding: 16,
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-card)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                MIND & BODY RITUALS
+              </div>
+              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
+                {todayHabitsCount} / 11
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                {todayHabitsPct}% completed today
+              </div>
             </div>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-gold)", margin: "8px 0 4px 0" }}>
-              {currentStreak}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              days with disciplined execution
-            </div>
-          </div>
 
-          {/* Card 4: Perfect Process Days */}
-          <div
-            className="glass-card"
-            style={{
-              padding: 16,
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-card)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              PERFECT DAYS
+            {/* Card 3: Current Streak */}
+            <div
+              className="glass-card"
+              style={{
+                padding: 16,
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-card)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                CURRENT STREAK
+              </div>
+              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-gold)", margin: "8px 0 4px 0" }}>
+                {currentStreak}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                days with disciplined execution
+              </div>
             </div>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
-              {perfectDaysCount}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              Full rituals + Full SOP
+
+            {/* Card 4: Perfect Process Days */}
+            <div
+              className="glass-card"
+              style={{
+                padding: 16,
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-card)",
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                PERFECT DAYS
+              </div>
+              <div className="mono" style={{ fontSize: 24, fontWeight: 900, color: "var(--color-win-text)", margin: "8px 0 4px 0" }}>
+                {perfectDaysCount}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                Full rituals + Full SOP
+              </div>
             </div>
           </div>
         </div>
