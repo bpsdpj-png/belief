@@ -224,18 +224,19 @@ export default function DailyHabitsTab() {
             </div>
 
             <h1
+              className="habits-hero-title"
               style={{
                 fontSize: "clamp(22px, 3.5vw, 32px)",
                 fontWeight: 800,
-                margin: "0 0 8px 0",
-                color: "#FFFFFF",
+                margin: "0 0 10px 0",
+                lineHeight: 1.25,
               }}
             >
-              Build the person who can hold ₹20 crore.
+              Before you command <span className="gold-text-accent">₹20 Crore</span>, you must command yourself.
             </h1>
 
-            <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: 0, maxWidth: 640 }}>
-              Track the routines that support calm decisions, physical energy, and focused execution.
+            <p style={{ color: "var(--text-secondary)", fontSize: 14.5, margin: 0, maxWidth: 660, lineHeight: 1.6, fontWeight: 500 }}>
+              The market never bows to desire — it surrenders to discipline. Master your dawn, conquer volatility, and the empire becomes inevitable.
             </p>
           </div>
 
