@@ -315,14 +315,37 @@ export default function DailyHabitsTab() {
             </p>
           </div>
 
-          {/* Right Dual Scorecard Badges */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 200 }}>
-            {/* Mind & Body Pill */}
+          {/* Right Dual Scorecard Badges with Avatar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 280, flexWrap: "wrap" }}>
+            {/* Interactive Avatar Medallion */}
             <div
               style={{
-                padding: "10px 16px",
-                borderRadius: 12,
-                background: "var(--bg-elevated)",
+                width: 76,
+                height: 76,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: isTodaySopHonored && todayHabitsCount >= 8 ? "3px solid var(--color-win)" : "3px solid var(--color-gold)",
+                boxShadow: isTodaySopHonored && todayHabitsCount >= 8 ? "0 0 18px rgba(16, 185, 129, 0.45)" : "0 0 14px rgba(198, 167, 94, 0.35)",
+                flexShrink: 0,
+                background: "var(--bg-card)",
+                transition: "all 0.3s ease",
+              }}
+              title={isTodaySopHonored && todayHabitsCount >= 8 ? "Ascended Master: Discipline & Process Honored!" : "Zen Yogi: Meditating & Staying Centered"}
+            >
+              <img
+                src={isTodaySopHonored && todayHabitsCount >= 8 ? "/avatars/avatar_happy.jpg" : "/avatars/avatar_zen.jpg"}
+                alt="Zen Trader Avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: "1 1 200px" }}>
+              {/* Mind & Body Pill */}
+              <div
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  background: "var(--bg-elevated)",
                 border: "1px solid var(--border-subtle)",
                 display: "flex",
                 justifyContent: "space-between",
@@ -367,6 +390,7 @@ export default function DailyHabitsTab() {
           </div>
         </div>
       </div>
+    </div>
 
       {/* 2. MAIN CHECKLIST & 4 KPI SUMMARY CARDS */}
       <div

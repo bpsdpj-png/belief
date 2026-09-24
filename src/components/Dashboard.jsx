@@ -320,6 +320,8 @@ export default function Dashboard() {
   const [showLedgerForm, setShowLedgerForm] = useState(false);
   const [showHoldingForm, setShowHoldingForm] = useState(false);
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarPreviewMode, setAvatarPreviewMode] = useState(null); // null (auto) | 'zen' | 'happy'
   const [showQuickPartModal, setShowQuickPartModal] = useState(false);
   const [quickPartHoldingId, setQuickPartHoldingId] = useState(null);
   const [quickPartDraft, setQuickPartDraft] = useState({ date: todayLocalISO(), qty: "", buyPrice: "", note: "" });
@@ -593,6 +595,31 @@ export default function Dashboard() {
       capitalAppreciation, capitalAppreciationPct, downsideFromStart, downsideFromStartPct, profitWithdrawalDeficit,
     };
   }, [trades, ledger, holdings, startingCapital, tradesSorted]);
+
+  // Avatar companion dynamic emotional states
+  const isAvatarHappy = stats.todayPnl > 0 && stats.discipline >= 80;
+  const autoAvatarSrc = isAvatarHappy ? "/avatars/avatar_happy.jpg" : "/avatars/avatar_zen.jpg";
+  const displayedAvatarSrc = avatarPreviewMode === "happy"
+    ? "/avatars/avatar_happy.jpg"
+    : avatarPreviewMode === "zen"
+    ? "/avatars/avatar_zen.jpg"
+    : autoAvatarSrc;
+
+  const avatarStateLabel = (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
+    ? "Ascended Master: Profit & Discipline"
+    : stats.todayPnl < 0 && stats.discipline >= 80
+    ? "Stoic Guardian: Capital Defended"
+    : stats.discipline < 80
+    ? "Vigilant Mentor: Discipline Focus"
+    : "Zen Yogi: Calm Inner Mastery";
+
+  const avatarQuoteMessage = (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
+    ? "Mind stilled. Capital expanded. You honored your rules, and compounding rewarded your execution today. Stay humble."
+    : stats.todayPnl < 0 && stats.discipline >= 80
+    ? "A planned stop-loss is the warrior's fee. Your capital was protected today. Return tomorrow at dawn with calm conviction."
+    : stats.discipline < 80
+    ? "The market gives warnings before it takes capital. Do not chase. Your ₹20 Crore empire is built on rules, not emotions."
+    : "Before you command ₹20 Crore, you must command yourself. Surya Namaskar and meditation prepare the vessel.";
 
   // Trade actions
   const addTrade = async () => {
@@ -1272,6 +1299,33 @@ export default function Dashboard() {
               {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
 
+            {/* Avatar Profile Medallion */}
+            <button
+              onClick={() => setShowAvatarModal(true)}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                padding: 0,
+                border: isAvatarHappy ? "2px solid var(--color-win)" : "2px solid var(--color-gold)",
+                boxShadow: isAvatarHappy ? "0 0 10px rgba(16, 185, 129, 0.45)" : "0 0 8px rgba(198, 167, 94, 0.35)",
+                overflow: "hidden",
+                cursor: "pointer",
+                background: "var(--bg-elevated)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+              }}
+              title="Your Trading Companion Avatar (Click to view mood & wisdom)"
+            >
+              <img
+                src={autoAvatarSrc}
+                alt="Avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </button>
+
             {saveState !== "idle" && (
               <span className="mono" style={{ fontSize: 11, color: "var(--color-gold)", marginLeft: 4 }}>
                 {saveState === "saving" ? "saving…" : "saved ✓"}
@@ -1559,6 +1613,126 @@ export default function Dashboard() {
               background: "var(--color-loss)", border: "none", color: "#FFFFFF",
               borderRadius: 8, padding: "10px 22px", fontSize: 13, fontWeight: 600, cursor: "pointer"
             }}>Record Withdrawal</button>
+          </div>
+        </ModalWrapper>
+      )}
+
+      {/* Modal: Trader Avatar Companion */}
+      {showAvatarModal && (
+        <ModalWrapper onClose={() => { setShowAvatarModal(false); setAvatarPreviewMode(null); }} title="Your Trading Companion Avatar">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "10px 0" }}>
+            {/* Avatar Artwork Frame */}
+            <div style={{
+              width: 190,
+              height: 190,
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "4px solid var(--color-win)" : "4px solid var(--color-gold)",
+              boxShadow: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy))
+                ? "0 0 30px rgba(16, 185, 129, 0.35), 0 10px 24px rgba(0,0,0,0.25)"
+                : "0 0 30px rgba(198, 167, 94, 0.35), 0 10px 24px rgba(0,0,0,0.25)",
+              marginBottom: 16,
+              background: "var(--bg-card)",
+            }}>
+              <img
+                src={displayedAvatarSrc}
+                alt="Zen Trader Avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            {/* Persona Badge */}
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 14px",
+              borderRadius: 20,
+              background: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win-soft)" : "var(--color-gold-soft)",
+              border: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "1px solid var(--color-win-border)" : "1px solid var(--color-gold-border)",
+              color: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win-text)" : "var(--color-gold)",
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 12,
+            }}>
+              <Sparkles size={13} />
+              {avatarStateLabel}
+            </div>
+
+            {/* Avatar Quote */}
+            <div style={{
+              maxWidth: 480,
+              fontSize: 14.5,
+              fontWeight: 600,
+              lineHeight: 1.5,
+              color: "var(--text-main)",
+              fontStyle: "italic",
+              marginBottom: 16,
+              background: "var(--bg-elevated)",
+              padding: "14px 20px",
+              borderRadius: 12,
+              border: "1px solid var(--border-subtle)",
+            }}>
+              "{avatarQuoteMessage}"
+            </div>
+
+            {/* State KPIs */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 10,
+              width: "100%",
+              maxWidth: 480,
+              marginBottom: 18,
+            }}>
+              <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Today's P&L</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: stats.todayPnl >= 0 ? "var(--color-win-text)" : "var(--color-loss-text)" }}>
+                  {fmtSigned(stats.todayPnl)}
+                </div>
+              </div>
+              <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Discipline</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: stats.discipline >= 80 ? "var(--color-win-text)" : "var(--color-gold)" }}>
+                  {stats.discipline.toFixed(0)}%
+                </div>
+              </div>
+              <div style={{ background: "var(--bg-elevated)", padding: 10, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Streak</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: "var(--color-gold)" }}>
+                  {stats.streak || 0}d
+                </div>
+              </div>
+            </div>
+
+            {/* Avatar Mode Preview Toggles */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Switch Mood:</span>
+              <button
+                onClick={() => setAvatarPreviewMode(avatarPreviewMode === "zen" ? null : "zen")}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  background: (avatarPreviewMode === "zen" || (!avatarPreviewMode && !isAvatarHappy)) ? "var(--color-gold)" : "var(--bg-elevated)",
+                  color: (avatarPreviewMode === "zen" || (!avatarPreviewMode && !isAvatarHappy)) ? "#121927" : "var(--text-secondary)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                🧘 Meditating Zen
+              </button>
+              <button
+                onClick={() => setAvatarPreviewMode(avatarPreviewMode === "happy" ? null : "happy")}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  background: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "var(--color-win)" : "var(--bg-elevated)",
+                  color: (avatarPreviewMode === "happy" || (!avatarPreviewMode && isAvatarHappy)) ? "#FFFFFF" : "var(--text-secondary)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                ✨ Happy & Triumphant
+              </button>
+            </div>
           </div>
         </ModalWrapper>
       )}
