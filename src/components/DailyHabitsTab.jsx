@@ -171,10 +171,9 @@ export default function DailyHabitsTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 1. HERO BANNER */}
       <div
-        className="glass-card"
+        className="glass-card habits-hero-banner"
         style={{
           padding: "24px 28px",
-          background: "linear-gradient(135deg, rgba(229, 184, 105, 0.06) 0%, rgba(13, 18, 29, 0.96) 100%)",
           border: "1px solid var(--color-gold-border)",
           position: "relative",
           overflow: "hidden",
@@ -637,7 +636,7 @@ export default function DailyHabitsTab() {
                       flex: 1,
                       height: 6,
                       borderRadius: 3,
-                      background: "rgba(255, 255, 255, 0.08)",
+                      background: "var(--border-subtle)",
                       overflow: "hidden",
                     }}
                   >

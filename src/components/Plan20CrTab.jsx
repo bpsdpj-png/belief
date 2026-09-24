@@ -100,10 +100,9 @@ export default function Plan20CrTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 1. HERO SPREADSHEET PLAN CARD */}
       <div
-        className="glass-card"
+        className="glass-card hero-plan-card"
         style={{
           padding: "24px 28px",
-          background: "linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.98))",
           border: "1px solid rgba(245, 158, 11, 0.3)",
           position: "relative",
           overflow: "hidden",
@@ -154,6 +153,7 @@ export default function Plan20CrTab({
             </div>
 
             <h1
+              className="hero-plan-title"
               style={{
                 fontSize: "clamp(24px, 4vw, 34px)",
                 fontWeight: 800,
@@ -1021,7 +1021,7 @@ export default function Plan20CrTab({
                         background:
                           idx % 2 === 0
                             ? "var(--bg-elevated)"
-                            : "rgba(255, 255, 255, 0.02)",
+                            : "var(--bg-card)",
                         borderRadius: 8,
                         transition: "background 0.15s ease",
                       }}
@@ -1171,7 +1171,7 @@ export default function Plan20CrTab({
                       fontSize: 12,
                       marginTop: 10,
                       paddingTop: 10,
-                      borderTop: "1px solid rgba(255,255,255,0.06)",
+                      borderTop: "1px solid var(--border-subtle)",
                     }}
                   >
                     <div>

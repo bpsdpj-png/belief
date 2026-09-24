@@ -335,9 +335,12 @@ export default function Dashboard() {
   const [dbStatus, setDbStatus] = useState({ isSupabaseConnected: false, tablesReady: false });
   const [syncingAll, setSyncingAll] = useState(false);
 
-  // Sync theme to document body
+  // Sync theme to document body & html
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    document.body.setAttribute("data-theme", theme);
+    document.body.style.backgroundColor = theme === "light" ? "#F8FAFC" : "#070A11";
+    document.body.style.color = theme === "light" ? "#0F172A" : "#F8FAFC";
     localStorage.setItem("belief-theme", theme);
   }, [theme]);
 
@@ -1165,7 +1168,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", position: "relative", paddingBottom: 60 }}>
+    <div style={{ minHeight: "100vh", position: "relative", paddingBottom: 60, background: "var(--bg-main)", color: "var(--text-main)", transition: "background-color 0.2s ease, color 0.2s ease" }}>
       {/* Top Navigation Bar */}
       <header style={{
         position: "sticky", top: 0, zIndex: 100,
@@ -2236,11 +2239,10 @@ function MetricSummaryCard({ label, value, icon, isPnl, val, customColor }) {
 // Modal Wrapper Component
 function ModalWrapper({ children, onClose, title, subtitle }) {
   return (
-    <div style={{
+    <div className="modal-backdrop" style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0, 0, 0, 0.75)",
-      backdropFilter: "blur(6px)",
-      WebkitBackdropFilter: "blur(6px)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16
     }}>
       <div className="glass-card mobile-modal" style={{
