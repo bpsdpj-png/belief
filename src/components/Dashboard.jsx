@@ -1320,7 +1320,7 @@ export default function Dashboard() {
             ["trades", `Trade Log (${trades.length})`, <Briefcase size={14} />],
             ["capital", "Capital & Ledger", <Wallet size={14} />],
             ["investments", `Equity Investments (${holdings.length})`, <Briefcase size={14} />],
-            ["habits", "Daily Habits", <CheckCircle2 size={14} />],
+            ["habits", "Daily Habits & SOP", <CheckCircle2 size={14} />],
             ["discipline", "Discipline", <ShieldCheck size={14} />],
             ["plan20cr", "🎯 ₹20 Cr Plan", <Target size={14} />],
           ].map(([key, label, icon]) => (
