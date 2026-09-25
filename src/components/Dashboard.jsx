@@ -27,6 +27,7 @@ import {
 } from "../services/dashboardService";
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
+import PnLMountainClimber from "./PnLMountainClimber";
 import { BHARAT_ACTIVITIES, getBharatActivityById } from "../data/bharatAvatar";
 import {
   playMeditationChime,
@@ -1383,7 +1384,7 @@ export default function Dashboard() {
 
         {/* Tab Contents */}
         {tab === "overview" && (
-          <OverviewTab stats={stats} targetPct={targetPct} setTargetPct={setTargetPct} trades={tradesSorted} />
+          <OverviewTab stats={stats} targetPct={targetPct} setTargetPct={setTargetPct} trades={tradesSorted} startingCapital={startingCapital} />
         )}
 
         {tab === "trades" && (
@@ -3412,13 +3413,21 @@ function WeeklyPnLCard({ trades }) {
 }
 
 // Overview Tab Component
-function OverviewTab({ stats, targetPct, setTargetPct, trades }) {
+function OverviewTab({ stats, targetPct, setTargetPct, trades, startingCapital }) {
   const dailyTarget = stats.currentCapital * (targetPct / 100);
   const stopLossLow = dailyTarget * 1;
   const stopLossHigh = dailyTarget * 1.5;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* 1. Panoramic Feature: Bharat's Live P&L Mountain Ascent */}
+      <PnLMountainClimber
+        curve={stats.curve}
+        totalNet={stats.totalNet}
+        peakProfit={stats.peakProfit || 0}
+        startingCapital={startingCapital}
+      />
+
       {/* Top Row: Equity Growth Curve & Profit Curve */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
         <div className="glass-card equity-chart-card" style={{ padding: 18 }}>

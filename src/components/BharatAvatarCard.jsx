@@ -106,22 +106,22 @@ export default function BharatAvatarCard({
     switch (currentActivity.id) {
       case "workout":
         return {
-          animation: "avatarPushupMotion 2.4s ease-in-out infinite",
+          animation: "avatarPushupMotion 2.6s cubic-bezier(0.45, 0, 0.25, 1) infinite",
           transformOrigin: "center bottom",
         };
       case "meditation":
         return {
-          animation: "avatarLevitate 3.8s ease-in-out infinite",
+          animation: "avatarLevitate 4s ease-in-out infinite",
           transformOrigin: "center center",
         };
       case "cricket":
         return {
-          animation: "avatarCricketTap 3.4s ease-in-out infinite",
+          animation: "avatarCricketTap 3.6s ease-in-out infinite",
           transformOrigin: "center bottom",
         };
       case "romance":
         return {
-          animation: "avatarLevitate 4.5s ease-in-out infinite",
+          animation: "avatarRomanceBreeze 4.2s ease-in-out infinite",
           transformOrigin: "center center",
         };
       case "profit":
@@ -131,7 +131,7 @@ export default function BharatAvatarCard({
         };
       default:
         return {
-          animation: "avatarLevitate 5s ease-in-out infinite",
+          animation: "avatarLevitate 4.5s ease-in-out infinite",
           transformOrigin: "center center",
         };
     }
@@ -272,7 +272,31 @@ export default function BharatAvatarCard({
           />
         </div>
 
-        {/* 🧘 Layer: Meditation Expanding Golden Energy Ripples */}
+        {/* 💪 Layer: Workout Floor Impact Ripple */}
+        {currentActivity.id === "workout" && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "6%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              style={{
+                width: 140,
+                height: 24,
+                borderRadius: "50%",
+                border: "2px solid rgba(229, 184, 105, 0.75)",
+                boxShadow: "0 0 16px rgba(229, 184, 105, 0.4)",
+                animation: "pushupFloorRipple 2.6s cubic-bezier(0.45, 0, 0.25, 1) infinite",
+              }}
+            />
+          </div>
+        )}
+
+        {/* 🧘 Layer: Meditation 3-Tier Expanding Golden Prana Waves */}
         {currentActivity.id === "meditation" && (
           <div
             style={{
@@ -283,16 +307,24 @@ export default function BharatAvatarCard({
               pointerEvents: "none",
             }}
           >
-            <div
-              style={{
-                width: 140,
-                height: 140,
-                borderRadius: "50%",
-                border: "2px solid rgba(245, 158, 11, 0.65)",
-                boxShadow: "0 0 24px rgba(245, 158, 11, 0.4)",
-                animation: "avatarAuraPulse 3s ease-out infinite",
-              }}
-            />
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 130 + i * 22,
+                  height: 130 + i * 22,
+                  borderRadius: "50%",
+                  border: `2px solid rgba(229, 184, 105, ${0.7 - i * 0.18})`,
+                  boxShadow: "0 0 24px rgba(229, 184, 105, 0.35)",
+                  animation: "avatarAuraPulse 3.6s ease-out infinite",
+                  animationDelay: `${i * 1.1}s`,
+                }}
+              />
+            ))}
           </div>
         )}
 
@@ -326,22 +358,42 @@ export default function BharatAvatarCard({
           </div>
         )}
 
-        {/* 🌹 Layer: Rooftop Romance Candle Flame Glow */}
+        {/* 🌹 Layer: Rooftop Romance Candle Flame Glow & Stardust */}
         {currentActivity.id === "romance" && (
-          <div
-            style={{
-              position: "absolute",
-              top: "54%",
-              left: "49%",
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              background: "rgba(245, 158, 11, 0.8)",
-              boxShadow: "0 0 20px rgba(245, 158, 11, 0.95)",
-              animation: "avatarCandleFlicker 1.8s ease-in-out infinite",
-              pointerEvents: "none",
-            }}
-          />
+          <>
+            <div
+              style={{
+                position: "absolute",
+                top: "54%",
+                left: "49%",
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: "rgba(229, 184, 105, 0.9)",
+                boxShadow: "0 0 22px rgba(229, 184, 105, 1)",
+                animation: "avatarCandleFlicker 1.8s ease-in-out infinite",
+                pointerEvents: "none",
+              }}
+            />
+            {[15, 38, 62, 85].map((left, idx) => (
+              <div
+                key={idx}
+                style={{
+                  position: "absolute",
+                  left: `${left}%`,
+                  top: `${18 + idx * 16}%`,
+                  width: 3.5,
+                  height: 3.5,
+                  borderRadius: "50%",
+                  background: "#FFE39B",
+                  boxShadow: "0 0 6px #FFE39B",
+                  animation: "avatarCandleFlicker 2.2s ease-in-out infinite",
+                  animationDelay: `${idx * 0.5}s`,
+                  pointerEvents: "none",
+                }}
+              />
+            ))}
+          </>
         )}
 
         {/* 📖 Layer: Juice Bubbles Rising */}

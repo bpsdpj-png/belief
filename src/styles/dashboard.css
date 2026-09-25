@@ -4,43 +4,45 @@
   --font-sans: 'Futura', 'Futura PT', 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Futura', 'Jost', 'JetBrains Mono', monospace;
 
-  /* Dark Theme (Default) - Bespoke Navy, Warm Beige & Soft Gold */
-  --bg-main: #121927;
-  --bg-card: #1F2A44;
-  --bg-card-hover: #263454;
-  --bg-elevated: #283654;
-  --bg-input: #172033;
-  --border-card: rgba(232, 220, 200, 0.12);
-  --border-card-hover: rgba(198, 167, 94, 0.45);
-  --border-subtle: rgba(232, 220, 200, 0.08);
-  --border-input: rgba(232, 220, 200, 0.18);
+  /* Dark Theme (Default) - Bespoke Imperial Midnight Navy & Regal Champagne Gold */
+  --bg-main: #060B18;
+  --bg-card: #0C162D;
+  --bg-card-hover: #111F3D;
+  --bg-elevated: #142447;
+  --bg-input: #081022;
+  --border-card: rgba(229, 184, 105, 0.16);
+  --border-card-hover: rgba(229, 184, 105, 0.48);
+  --border-subtle: rgba(229, 184, 105, 0.08);
+  --border-input: rgba(229, 184, 105, 0.22);
 
-  --text-main: #FDFBF7;
-  --text-secondary: #E8DCC8;
-  --text-muted: #9AAEC4;
+  --text-main: #FBF9F5;
+  --text-secondary: #E2D7C3;
+  --text-muted: #8E9FBE;
 
-  --color-gold: #C6A75E;
-  --color-gold-soft: rgba(198, 167, 94, 0.14);
-  --color-gold-border: rgba(198, 167, 94, 0.35);
+  --color-gold: #E5B869;
+  --color-gold-light: #F7E5BD;
+  --color-gold-dark: #C69F47;
+  --color-gold-soft: rgba(229, 184, 105, 0.14);
+  --color-gold-border: rgba(229, 184, 105, 0.35);
 
   --color-win: #10B981;
   --color-win-text: #34D399;
   --color-win-soft: rgba(16, 185, 129, 0.12);
-  --color-win-border: rgba(16, 185, 129, 0.25);
+  --color-win-border: rgba(16, 185, 129, 0.28);
 
   --color-loss: #F43F5E;
   --color-loss-text: #FB7185;
   --color-loss-soft: rgba(244, 63, 94, 0.12);
-  --color-loss-border: rgba(244, 63, 94, 0.25);
+  --color-loss-border: rgba(244, 63, 94, 0.28);
 
-  --chart-grid: rgba(232, 220, 200, 0.06);
-  --chart-tooltip-bg: #1F2A44;
-  --chart-tooltip-border: rgba(198, 167, 94, 0.35);
-  --chart-axis: #9AAEC4;
+  --chart-grid: rgba(229, 184, 105, 0.06);
+  --chart-tooltip-bg: #0C162D;
+  --chart-tooltip-border: rgba(229, 184, 105, 0.35);
+  --chart-axis: #8E9FBE;
 
-  --header-bg: rgba(18, 25, 39, 0.92);
-  --tab-active-bg: #283654;
-  --tab-active-text: #FDFBF7;
+  --header-bg: rgba(6, 11, 24, 0.90);
+  --tab-active-bg: #142447;
+  --tab-active-text: #FBF9F5;
 }
 
 [data-theme="light"] {
@@ -100,9 +102,10 @@ html, body {
   padding: 0;
   background-color: var(--bg-main);
   background-image: 
-    radial-gradient(1200px circle at 50% -12%, rgba(198, 167, 94, 0.09), transparent 60%),
-    radial-gradient(900px circle at 92% 35%, rgba(31, 42, 68, 0.65), transparent 50%),
-    radial-gradient(800px circle at 8% 65%, rgba(232, 220, 200, 0.04), transparent 50%);
+    radial-gradient(1300px circle at 50% -12%, rgba(229, 184, 105, 0.08), transparent 60%),
+    radial-gradient(1000px circle at 92% 35%, rgba(20, 36, 71, 0.75), transparent 50%),
+    radial-gradient(900px circle at 8% 65%, rgba(12, 22, 45, 0.85), transparent 50%),
+    radial-gradient(600px circle at 50% 90%, rgba(229, 184, 105, 0.04), transparent 50%);
   background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
@@ -222,7 +225,7 @@ button:active {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 30px -4px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(229, 184, 105, 0.12), 0 8px 32px -4px rgba(3, 8, 20, 0.55);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -234,7 +237,7 @@ button:active {
 
 .glass-card:hover {
   border-color: var(--border-card-hover);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 36px -6px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 1px 0 rgba(229, 184, 105, 0.2), 0 14px 40px -6px rgba(3, 8, 20, 0.75), 0 0 20px rgba(229, 184, 105, 0.08);
 }
 
 [data-theme="light"] .glass-card:hover {
@@ -504,8 +507,9 @@ button:active {
 
 /* Hero banners in Light Mode */
 .hero-plan-card {
-  background: linear-gradient(135deg, #1F2A44 0%, #172033 100%);
-  border: 1px solid rgba(198, 167, 94, 0.3);
+  background: linear-gradient(135deg, #0D1933 0%, #060B18 100%);
+  border: 1px solid rgba(229, 184, 105, 0.25);
+  box-shadow: inset 0 1px 0 rgba(229, 184, 105, 0.15), 0 12px 36px rgba(3, 8, 20, 0.6);
 }
 
 [data-theme="light"] .hero-plan-card {
@@ -521,7 +525,9 @@ button:active {
 }
 
 .habits-hero-banner {
-  background: linear-gradient(135deg, rgba(198, 167, 94, 0.12) 0%, #1F2A44 100%);
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.14) 0%, #0D1933 100%);
+  border: 1px solid rgba(229, 184, 105, 0.25);
+  box-shadow: inset 0 1px 0 rgba(229, 184, 105, 0.15), 0 12px 36px rgba(3, 8, 20, 0.6);
 }
 
 .habits-hero-title {
@@ -531,7 +537,7 @@ button:active {
 }
 
 .gold-text-accent {
-  background: linear-gradient(135deg, #FDFBF7 0%, #E8DCC8 30%, #C6A75E 75%, #F5E8D0 100%);
+  background: linear-gradient(135deg, #FFFDF8 0%, #F5E5C9 25%, #E5B869 60%, #D4AF37 85%, #F7E5BD 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 700;
@@ -663,67 +669,143 @@ button:active {
    BHARAT'S LIVE AVATAR KINETIC ACTION ENGINE
    ========================================================================== */
 
-/* 1. Meditation Floating Levitation */
+/* 1. Meditation Floating Levitation & Prana Breathing */
 @keyframes avatarLevitate {
-  0%, 100% {
+  0% {
     transform: translateY(0px) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  }
+  28% {
+    transform: translateY(-8px) scale(1.015);
   }
   50% {
-    transform: translateY(-15px) scale(1.015);
+    transform: translateY(-22px) scale(1.035);
+    filter: drop-shadow(0 16px 28px rgba(229, 184, 105, 0.35));
+  }
+  75% {
+    transform: translateY(-10px) scale(1.012);
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
   }
 }
 
-/* Golden Aura Energy Waves */
+/* Golden Aura Energy Waves (3-Tier Concentric Expansion) */
 @keyframes avatarAuraPulse {
   0% {
-    transform: scale(0.75);
-    opacity: 0.85;
+    transform: scale(0.65);
+    opacity: 0.95;
   }
-  50% {
-    opacity: 0.45;
+  45% {
+    opacity: 0.6;
   }
   100% {
-    transform: scale(1.4);
+    transform: scale(1.6);
     opacity: 0;
   }
 }
 
-/* 2. Pushups Active Kinetic Dip & Press */
+/* 2. Pushups Active Biomechanical Kinetic Dip & Press */
 @keyframes avatarPushupMotion {
-  0%, 100% {
-    transform: translateY(0px) scale(1);
+  0% {
+    transform: translateY(0px) scale(1) rotate(0deg);
   }
-  38% {
-    transform: translateY(18px) scale(0.975);
+  22% {
+    /* Descent towards floor */
+    transform: translateY(18px) scaleX(1.02) scaleY(0.95) rotate(-0.5deg);
   }
-  55% {
-    transform: translateY(18px) scale(0.975);
+  45% {
+    /* Deep chest-to-deck bottom dip */
+    transform: translateY(34px) scaleX(1.05) scaleY(0.89) rotate(-1.2deg);
   }
-  85% {
-    transform: translateY(0px) scale(1.01);
+  58% {
+    /* Isometric bottom pause */
+    transform: translateY(34px) scaleX(1.05) scaleY(0.89) rotate(-1.2deg);
+  }
+  78% {
+    /* Powerful concentric push */
+    transform: translateY(10px) scaleX(0.99) scaleY(1.01) rotate(0.4deg);
+  }
+  90% {
+    /* High plank lockout */
+    transform: translateY(-4px) scale(1.01) rotate(0deg);
+  }
+  100% {
+    transform: translateY(0px) scale(1) rotate(0deg);
   }
 }
 
-/* 3. Cricket Bat Tap & Shot Sweep */
-@keyframes avatarCricketTap {
-  0%, 15%, 30% {
-    transform: translateY(0px) rotate(0deg);
+/* Pushup Floor Ripple */
+@keyframes pushupFloorRipple {
+  0%, 40% {
+    transform: scale(0.4);
+    opacity: 0;
   }
-  8%, 22% {
-    transform: translateY(5px) rotate(0.6deg);
-  }
-  50% {
-    transform: translateX(10px) translateY(-6px) rotate(-3.5deg) scale(1.02);
+  48% {
+    transform: scale(0.8);
+    opacity: 0.9;
   }
   65% {
-    transform: translateX(-12px) translateY(8px) rotate(4deg) scale(1.01);
+    transform: scale(1.5);
+    opacity: 0;
   }
-  85%, 100% {
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 3. Cricket Classical Cover Drive Kinetic Motion */
+@keyframes avatarCricketTap {
+  0%, 12% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  18% {
+    /* First tap on crease */
+    transform: translateY(7px) rotate(0.8deg);
+  }
+  26% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  32% {
+    /* Second sharp tap */
+    transform: translateY(8px) rotate(1.2deg);
+  }
+  44% {
+    /* High backlift & focus */
+    transform: translateX(-12px) translateY(-14px) rotate(5deg) scale(1.01);
+  }
+  60% {
+    /* Step forward into thunderous cover drive */
+    transform: translateX(22px) translateY(12px) rotate(-7deg) scale(1.05);
+    filter: drop-shadow(-8px 14px 20px rgba(0,0,0,0.6));
+  }
+  75% {
+    /* High elbow follow-through */
+    transform: translateX(28px) translateY(-8px) rotate(-9deg) scale(1.04);
+  }
+  88% {
+    /* Poised balance recovery */
+    transform: translateX(6px) translateY(-2px) rotate(-2deg);
+  }
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
 }
 
-/* 4. Rooftop Romance Candle Flame Flicker */
+/* 4. Rooftop Romance Gentle Breeze & Flame */
+@keyframes avatarRomanceBreeze {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-6px) rotate(-1deg) scale(1.01);
+  }
+  70% {
+    transform: translateY(4px) rotate(1.2deg) scale(0.995);
+  }
+}
+
 @keyframes avatarCandleFlicker {
   0%, 100% {
     opacity: 0.95;
