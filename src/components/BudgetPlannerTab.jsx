@@ -78,9 +78,10 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [budgetViewMode, setBudgetViewMode] = useState("monthly"); // "monthly" | "annual"
 
   // Modals State
-  const [activeModal, setActiveModal] = useState(null); // 'income' | 'expense' | 'transfer' | 'new_category' | 'edit_account'
+  const [activeModal, setActiveModal] = useState(null); // 'income' | 'expense' | 'transfer' | 'category' | 'edit_account'
   const [editAccountTarget, setEditAccountTarget] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
@@ -93,10 +94,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const [formDate, setFormDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [formNote, setFormNote] = useState("");
 
-  // New Category Form Fields
+  // Category Form Fields (Create & Edit)
+  const [editingCategoryId, setEditingCategoryId] = useState(null); // null = new, id = edit
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState("expense");
-  const [catBudget, setCatBudget] = useState("");
+  const [catMonthlyBudget, setCatMonthlyBudget] = useState("");
+  const [catAnnualBudget, setCatAnnualBudget] = useState("");
   const [catEmoji, setCatEmoji] = useState("🏷️");
 
   // Account Edit Form Fields
@@ -264,28 +267,108 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
     setActiveModal(null);
   };
 
-  // Handler for New Category Creation
-  const handleSaveNewCategory = (e) => {
+  // Bi-directional Auto-Division Budget Handlers
+  const handleMonthlyBudgetChange = (val) => {
+    setCatMonthlyBudget(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0) {
+      setCatAnnualBudget(String(Math.round(num * 12)));
+    } else if (val === "") {
+      setCatAnnualBudget("");
+    }
+  };
+
+  const handleAnnualBudgetChange = (val) => {
+    setCatAnnualBudget(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0) {
+      setCatMonthlyBudget(String(Math.round(num / 12)));
+    } else if (val === "") {
+      setCatMonthlyBudget("");
+    }
+  };
+
+  // Open modal for Creating New Category
+  const openNewCategoryModal = (type = "expense") => {
+    setEditingCategoryId(null);
+    setCatName("");
+    setCatType(type);
+    setCatMonthlyBudget("");
+    setCatAnnualBudget("");
+    setCatEmoji(type === "income" ? "💰" : "🏷️");
+    setActiveModal("category");
+  };
+
+  // Open modal for Editing Any Category (Predefined or Custom)
+  const openEditCategoryModal = (cat) => {
+    setEditingCategoryId(cat.id);
+    setCatName(cat.name);
+    setCatType(cat.type || "expense");
+    const monthly = cat.budget || 0;
+    setCatMonthlyBudget(monthly > 0 ? String(monthly) : "");
+    setCatAnnualBudget(monthly > 0 ? String(monthly * 12) : "");
+    setCatEmoji(cat.emoji || "🏷️");
+    setActiveModal("category");
+  };
+
+  // Save Category (Create or Edit)
+  const handleSaveCategory = (e) => {
     e.preventDefault();
     if (!catName.trim()) return;
 
-    const newCat = {
-      id: "cat_" + Date.now(),
-      name: catName.trim(),
-      type: catType,
-      budget: parseFloat(catBudget) || 0,
-      emoji: catEmoji.trim() || "🏷️",
-    };
+    const monthlyBudget = parseFloat(catMonthlyBudget) || 0;
 
-    setCategories((prev) => [...prev, newCat]);
-    setCatName("");
-    setCatBudget("");
+    if (editingCategoryId) {
+      // Update existing category (predefined or custom)
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.id === editingCategoryId
+            ? {
+                ...c,
+                name: catName.trim(),
+                type: catType,
+                budget: monthlyBudget,
+                emoji: catEmoji.trim() || "🏷️",
+              }
+            : c
+        )
+      );
+    } else {
+      // Create new category
+      const newCat = {
+        id: "cat_" + Date.now(),
+        name: catName.trim(),
+        type: catType,
+        budget: monthlyBudget,
+        emoji: catEmoji.trim() || (catType === "income" ? "💰" : "🏷️"),
+      };
+      setCategories((prev) => [...prev, newCat]);
+    }
+
     setActiveModal(null);
+    setEditingCategoryId(null);
+    setCatName("");
+    setCatMonthlyBudget("");
+    setCatAnnualBudget("");
   };
 
   // Delete Category
   const handleDeleteCategory = (catId) => {
-    setCategories((prev) => prev.filter((c) => c.id !== catId));
+    const cat = categories.find((c) => c.id === catId);
+    if (window.confirm(`Delete category "${cat?.name || "this category"}"? Existing ledger transactions will retain their records.`)) {
+      setCategories((prev) => prev.filter((c) => c.id !== catId));
+      if (editingCategoryId === catId) {
+        setActiveModal(null);
+        setEditingCategoryId(null);
+      }
+    }
+  };
+
+  // Reset Categories to Initial Defaults
+  const handleResetCategories = () => {
+    if (window.confirm("Reset all expense and income categories back to default values?")) {
+      setCategories(DEFAULT_CATEGORIES);
+    }
   };
 
   // Delete Transaction
@@ -342,6 +425,11 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
 
   const expenseCategories = categories.filter((c) => c.type === "expense");
   const incomeCategories = categories.filter((c) => c.type === "income");
+
+  const totalMonthlyBudget = useMemo(() => {
+    return expenseCategories.reduce((sum, c) => sum + (Number(c.budget) || 0), 0);
+  }, [expenseCategories]);
+  const totalAnnualBudget = totalMonthlyBudget * 12;
 
   // Donut Chart Data
   const donutData = [
@@ -624,7 +712,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             </button>
 
             <button
-              onClick={() => setActiveModal("new_category")}
+              onClick={() => openNewCategoryModal("expense")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -734,19 +822,31 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               </div>
               <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>This month's inflows by source</div>
             </div>
-            <button
-              onClick={() => {
-                setFormType("income");
-                setFormCategory(incomeCategories[0]?.id || "trading_profit");
-                setActiveModal("income");
-              }}
-              style={{
-                background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                color: "var(--color-win-text)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
-              }}
-            >
-              + Inflow
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => openNewCategoryModal("income")}
+                style={{
+                  background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+                  color: "var(--color-gold)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
+                }}
+                title="Add New Custom Income Stream"
+              >
+                + Stream
+              </button>
+              <button
+                onClick={() => {
+                  setFormType("income");
+                  setFormCategory(incomeCategories[0]?.id || "trading_profit");
+                  setActiveModal("income");
+                }}
+                style={{
+                  background: "var(--color-win-soft)", border: "1px solid var(--color-win-border)",
+                  color: "var(--color-win-text)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
+                }}
+              >
+                + Inflow
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -768,14 +868,32 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                     border: "1px solid var(--border-subtle)",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 16 }}>{cat.emoji}</span>
                     <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-main)" }}>
                       {cat.name}
                     </span>
+                    <button
+                      onClick={() => openEditCategoryModal(cat)}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
+                      title="Edit Category Name & Emoji"
+                    >
+                      <Pencil size={11} />
+                    </button>
                   </div>
-                  <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: catTotal > 0 ? "var(--color-win-text)" : "var(--text-muted)" }}>
-                    {fmtINR(catTotal)}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: catTotal > 0 ? "var(--color-win-text)" : "var(--text-muted)" }}>
+                      {fmtINR(catTotal)}
+                    </div>
+                    {incomeCategories.length > 1 && (
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
+                        title="Delete Category"
+                      >
+                        <X size={11} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -858,32 +976,100 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
           </div>
         </div>
 
-        {/* Right Card: Expense Categories with Progress Bars */}
+        {/* Right Card: Expense Categories with Progress Bars & Annual Toggle */}
         <div className="glass-card" style={{ padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 Expense Budget vs. Actual
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>Monthly burn rate tracking</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                Planned: <span className="mono" style={{ fontWeight: 650, color: "var(--color-gold)" }}>{fmtINR(totalMonthlyBudget)}/mo</span>
+                {" "}&bull;{" "}
+                <span className="mono" style={{ fontWeight: 650, color: "var(--text-main)" }}>{fmtINR(totalAnnualBudget)}/yr</span>
+              </div>
             </div>
-            <button
-              onClick={() => setActiveModal("new_category")}
-              style={{
-                background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                color: "var(--color-gold)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
-              }}
-            >
-              + Category
-            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {/* Monthly vs Annual Toggle */}
+              <div style={{ display: "flex", background: "var(--bg-elevated)", borderRadius: 6, padding: 2, border: "1px solid var(--border-subtle)" }}>
+                <button
+                  type="button"
+                  onClick={() => setBudgetViewMode("monthly")}
+                  style={{
+                    background: budgetViewMode === "monthly" ? "var(--color-gold)" : "transparent",
+                    color: budgetViewMode === "monthly" ? "#081022" : "var(--text-secondary)",
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBudgetViewMode("annual")}
+                  style={{
+                    background: budgetViewMode === "annual" ? "var(--color-gold)" : "transparent",
+                    color: budgetViewMode === "annual" ? "#081022" : "var(--text-secondary)",
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                  title="View full annualized budget (divided into 12 months)"
+                >
+                  Annual (×12)
+                </button>
+              </div>
+
+              <button
+                onClick={() => openNewCategoryModal("expense")}
+                style={{
+                  background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+                  color: "var(--color-gold)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
+                }}
+              >
+                + Category
+              </button>
+
+              <button
+                onClick={handleResetCategories}
+                style={{
+                  background: "transparent", border: "1px solid var(--border-subtle)",
+                  color: "var(--text-muted)", borderRadius: 6, padding: "4px 6px", fontSize: 11, cursor: "pointer"
+                }}
+                title="Reset Categories to Default Recommendations"
+              >
+                ↺
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 310, overflowY: "auto", paddingRight: 4 }}>
             {expenseCategories.map((cat) => {
-              const spent = monthlyStats.categorySpending[cat.id] || 0;
-              const budget = cat.budget || 1;
-              const pct = Math.min(100, Math.round((spent / budget) * 100));
-              const isOver = spent > budget;
+              const isAnnual = budgetViewMode === "annual";
+              const currentYearPrefix = selectedMonth ? selectedMonth.slice(0, 4) : new Date().getFullYear().toString();
+
+              // Monthly values
+              const monthlySpent = monthlyStats.categorySpending[cat.id] || 0;
+              const monthlyBudget = cat.budget || 0;
+
+              // Annual values
+              const annualSpent = transactions
+                .filter((tx) => tx.type === "expense" && tx.categoryId === cat.id && tx.date.startsWith(currentYearPrefix))
+                .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+              const annualBudget = monthlyBudget * 12;
+
+              const displaySpent = isAnnual ? annualSpent : monthlySpent;
+              const displayBudget = isAnnual ? annualBudget : monthlyBudget;
+              const pct = displayBudget > 0 ? Math.min(100, Math.round((displaySpent / displayBudget) * 100)) : 0;
+              const isOver = displayBudget > 0 && displaySpent > displayBudget;
 
               return (
                 <div key={cat.id}>
@@ -893,16 +1079,28 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                       <span style={{ fontSize: 12.5, fontWeight: 650, color: "var(--text-main)" }}>
                         {cat.name}
                       </span>
+                      <button
+                        onClick={() => openEditCategoryModal(cat)}
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
+                        title="Edit Category Name, Emoji, or Budget Target"
+                      >
+                        <Pencil size={11} />
+                      </button>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isOver ? "var(--color-loss-text)" : "var(--text-main)" }}>
-                        {fmtINR(spent)} / {fmtINR(cat.budget)}
-                      </span>
-                      {cat.id.startsWith("cat_") && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isOver ? "var(--color-loss-text)" : "var(--text-main)" }}>
+                          {fmtINR(displaySpent)} / {fmtINR(displayBudget)}
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
+                          {isAnnual ? `(${fmtINR(monthlyBudget)}/mo)` : `(${fmtINR(annualBudget)}/yr)`}
+                        </span>
+                      </div>
+                      {expenseCategories.length > 1 && (
                         <button
                           onClick={() => handleDeleteCategory(cat.id)}
-                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0 }}
-                          title="Delete Custom Category"
+                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
+                          title="Delete Category"
                         >
                           <X size={11} />
                         </button>
@@ -1370,8 +1568,8 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
         </div>
       )}
 
-      {/* 8. MODAL: CREATE CUSTOM CATEGORY */}
-      {activeModal === "new_category" && (
+      {/* 8. MODAL: MANAGE CATEGORY (EDIT & CREATE WITH ANNUAL/MONTHLY AUTO-DIVISION) */}
+      {activeModal === "category" && (
         <div
           className="modal-backdrop"
           style={{
@@ -1388,22 +1586,35 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             className="glass-card mobile-modal"
             style={{
               width: "100%",
-              maxWidth: 420,
+              maxWidth: 460,
               padding: 24,
               maxHeight: "90vh",
               overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
-                Add Custom Category
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
+                  {editingCategoryId ? "Edit Category Details" : "Create New Category"}
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>
+                  {editingCategoryId
+                    ? "Update category name, emoji, or annual/monthly budget allocations"
+                    : "Define custom category and divide budget automatically"}
+                </div>
               </div>
-              <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}>
+              <button
+                onClick={() => {
+                  setActiveModal(null);
+                  setEditingCategoryId(null);
+                }}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveNewCategory} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <form onSubmit={handleSaveCategory} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label>Category Type</label>
                 <select value={catType} onChange={(e) => setCatType(e.target.value)}>
@@ -1412,72 +1623,163 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "70px 1fr", gap: 10 }}>
-                <div>
-                  <label>Emoji</label>
+              <div>
+                <label>Emoji & Icon</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <input
                     type="text"
                     value={catEmoji}
                     onChange={(e) => setCatEmoji(e.target.value)}
-                    style={{ textAlign: "center", fontSize: 18 }}
+                    style={{ textAlign: "center", fontSize: 20, width: 64, flexShrink: 0 }}
                   />
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                    Select a quick emoji below or type any custom emoji
+                  </div>
                 </div>
-                <div>
-                  <label>Category Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Golf, Mentorship, Tech"
-                    value={catName}
-                    onChange={(e) => setCatName(e.target.value)}
-                    required
-                  />
+                {/* Quick Emoji Chips */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {["🏠", "🥗", "🚗", "🏏", "💻", "✨", "💊", "🛍️", "✈️", "📚", "📈", "💼", "💰", "🪙", "⚡", "🎁", "🛡️", "🏷️"].map((em) => (
+                    <button
+                      key={em}
+                      type="button"
+                      onClick={() => setCatEmoji(em)}
+                      style={{
+                        background: catEmoji === em ? "var(--color-gold-soft)" : "var(--bg-elevated)",
+                        border: catEmoji === em ? "1px solid var(--color-gold)" : "1px solid var(--border-subtle)",
+                        borderRadius: 6,
+                        padding: "3px 7px",
+                        fontSize: 14,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {em}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              <div>
+                <label>Category Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Golf, Mentorship, Tech Tools, Groceries"
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  required
+                />
+              </div>
+
               {catType === "expense" && (
-                <div>
-                  <label>Monthly Budget Target (₹)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 10000"
-                    value={catBudget}
-                    onChange={(e) => setCatBudget(e.target.value)}
-                  />
+                <div
+                  style={{
+                    background: "var(--bg-elevated)",
+                    padding: 14,
+                    borderRadius: 10,
+                    border: "1px solid var(--border-subtle)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Budget Allocation (Auto-Divided)
+                    </span>
+                    <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--color-gold-soft)", color: "var(--color-gold)", fontWeight: 700 }}>
+                      ÷ 12 MONTHS
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 10.5, marginBottom: 4 }}>Annual Budget (₹/yr)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 120000"
+                        value={catAnnualBudget}
+                        onChange={(e) => handleAnnualBudgetChange(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10.5, marginBottom: 4 }}>Monthly Budget (₹/mo)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 10000"
+                        value={catMonthlyBudget}
+                        onChange={(e) => handleMonthlyBudgetChange(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                    <span>💡</span>
+                    <span>
+                      {parseFloat(catAnnualBudget) > 0
+                        ? `₹${Number(catAnnualBudget).toLocaleString("en-IN")}/yr automatically divides into ₹${Number(catMonthlyBudget || 0).toLocaleString("en-IN")}/month`
+                        : "Enter annual budget to divide by 12, or enter monthly target directly."}
+                    </span>
+                  </div>
                 </div>
               )}
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    background: "transparent",
-                    border: "1px solid var(--border-subtle)",
-                    color: "var(--text-secondary)",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 8,
-                    background: "var(--color-gold)",
-                    border: "none",
-                    color: "#081022",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  Create Category
-                </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                <div>
+                  {editingCategoryId && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(editingCategoryId)}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        background: "var(--color-loss-soft)",
+                        border: "1px solid var(--color-loss-border)",
+                        color: "var(--color-loss-text)",
+                        cursor: "pointer",
+                        fontSize: 12.5,
+                        fontWeight: 650,
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveModal(null);
+                      setEditingCategoryId(null);
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      background: "transparent",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "8px 20px",
+                      borderRadius: 8,
+                      background: "var(--color-gold)",
+                      border: "none",
+                      color: "#081022",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {editingCategoryId ? "Save Changes" : "Create Category"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
