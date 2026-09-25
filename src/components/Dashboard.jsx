@@ -1409,6 +1409,11 @@ export default function Dashboard() {
             trades={trades}
             todayPnl={stats.todayPnl}
             currentCapital={stats.currentCapital}
+            holdings={holdings}
+            holdingsInvested={stats.holdingsInvested}
+            holdingsCurrentValue={stats.holdingsCurrentValue}
+            holdingsReturnPct={stats.holdingsReturnPct}
+            equityXIRR={stats.equityXIRR}
           />
         )}
 

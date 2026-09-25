@@ -15,11 +15,33 @@ const DEFAULT_ACCOUNTS = {
   cash: { id: "cash", name: "Cash in Hand", openingBalance: 25000, color: "var(--color-info-text)" },
 };
 
+export const isCategoryInvestment = (cat) => {
+  if (!cat) return false;
+  if (cat.isInvestment) return true;
+  const n = (cat.name || "").toLowerCase();
+  const id = (cat.id || "").toLowerCase();
+  return (
+    n.includes("invest") ||
+    n.includes("sip") ||
+    n.includes("equity") ||
+    n.includes("stock") ||
+    n.includes("mutual fund") ||
+    n.includes("portfolio") ||
+    n.includes("share") ||
+    n.includes("gold") ||
+    n.includes("etf") ||
+    n.includes("mf") ||
+    id.includes("invest") ||
+    id.includes("equity")
+  );
+};
+
 const DEFAULT_CATEGORIES = [
   // Expense Categories
   { id: "housing", name: "Housing & Utilities", budget: 30000, type: "expense", emoji: "🏠" },
   { id: "food", name: "Food & Groceries", budget: 18000, type: "expense", emoji: "🥗" },
   { id: "transport", name: "Transportation & Fuel", budget: 8000, type: "expense", emoji: "🚗" },
+  { id: "investments", name: "Investments & SIPs", budget: 35000, type: "expense", emoji: "📈", isInvestment: true },
   { id: "fitness", name: "Fitness & Cricket", budget: 6000, type: "expense", emoji: "🏏" },
   { id: "trading_overheads", name: "Trading Tools & Data", budget: 5000, type: "expense", emoji: "💻" },
   { id: "lifestyle", name: "Lifestyle & Dining", budget: 12000, type: "expense", emoji: "✨" },
@@ -42,7 +64,16 @@ const EMOJI_GROUPS = {
   "Lifestyle": ["✨", "🛍️", "🎬", "🎵", "🎉", "🎁", "👔", "👗", "🕶️", "🍻", "🏖️", "🌴", "📚"],
 };
 
-export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCapital = 0 }) {
+export default function BudgetPlannerTab({
+  trades = [],
+  todayPnl = 0,
+  currentCapital = 0,
+  holdings = [],
+  holdingsInvested = 0,
+  holdingsCurrentValue = 0,
+  holdingsReturnPct = 0,
+  equityXIRR = null,
+}) {
   // 1. Persistent State
   const [accounts, setAccounts] = useState(() => {
     try {
@@ -56,7 +87,17 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const [categories, setCategories] = useState(() => {
     try {
       const saved = localStorage.getItem("belief_budget_categories_v1");
-      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+      if (!saved) return DEFAULT_CATEGORIES;
+      const parsed = JSON.parse(saved);
+      // Ensure an investments category exists in saved list
+      const hasInv = parsed.some((c) => isCategoryInvestment(c));
+      if (!hasInv) {
+        return [
+          ...parsed,
+          { id: "investments", name: "Investments & SIPs", budget: 35000, type: "expense", emoji: "📈", isInvestment: true },
+        ];
+      }
+      return parsed;
     } catch {
       return DEFAULT_CATEGORIES;
     }
@@ -110,6 +151,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const [catMonthlyBudget, setCatMonthlyBudget] = useState("");
   const [catAnnualBudget, setCatAnnualBudget] = useState("");
   const [catEmoji, setCatEmoji] = useState("🏷️");
+  const [catIsInvestment, setCatIsInvestment] = useState(false);
   const [selectedEmojiGroup, setSelectedEmojiGroup] = useState("Finance");
 
   // Account Edit Form Fields
@@ -177,6 +219,8 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const monthlyStats = useMemo(() => {
     let totalInflow = 0;
     let totalExpense = 0;
+    let investmentExpense = 0; // Outflows routed into compounding assets (SIPs, stocks, equity, etc.)
+    let livingExpense = 0;     // Pure consumption (rent, food, fuel, bills)
     const categorySpending = {};
 
     monthlyTransactions.forEach((tx) => {
@@ -186,29 +230,46 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
       } else if (tx.type === "expense") {
         totalExpense += amt;
         categorySpending[tx.categoryId] = (categorySpending[tx.categoryId] || 0) + amt;
+
+        const cat = categories.find((c) => c.id === tx.categoryId);
+        const isInv =
+          isCategoryInvestment(cat) ||
+          Boolean(tx.note && /invest|sip|equity|stock|fund|share|etf|mutual/i.test(tx.note));
+
+        if (isInv) {
+          investmentExpense += amt;
+        } else {
+          livingExpense += amt;
+        }
       }
     });
 
     const netSurplus = totalInflow - totalExpense;
     const surplusPct = totalInflow > 0 ? (netSurplus / totalInflow) * 100 : 0;
 
-    // Wealth Compounding Donut breakdown from surplus (or zero if deficit)
-    const investableSurplus = Math.max(0, netSurplus);
-    const warChest = Math.round(investableSurplus * (allocations.warChestPct / 100));
-    const equityPortfolio = Math.round(investableSurplus * (allocations.equityPct / 100));
-    const emergencyBuffer = Math.round(investableSurplus * (allocations.emergencyPct / 100));
+    // Remaining cash surplus after all expenses (or zero if cashflow is in deficit)
+    const unallocatedSurplus = Math.max(0, netSurplus);
+    const warChest = Math.round(unallocatedSurplus * (allocations.warChestPct / 100));
+    const emergencyBuffer = Math.round(unallocatedSurplus * (allocations.emergencyPct / 100));
+
+    // Equity Portfolio gets direct investments from expenses + surplus partition share
+    const surplusEquityShare = Math.round(unallocatedSurplus * (allocations.equityPct / 100));
+    const equityPortfolio = investmentExpense + surplusEquityShare;
 
     return {
       totalInflow,
       totalExpense,
+      investmentExpense,
+      livingExpense,
       netSurplus,
       surplusPct,
       categorySpending,
       warChest,
       equityPortfolio,
+      surplusEquityShare,
       emergencyBuffer,
     };
-  }, [monthlyTransactions, allocations]);
+  }, [monthlyTransactions, allocations, categories]);
 
   // Filtered transactions for the ledger table
   const filteredLedger = useMemo(() => {
@@ -306,6 +367,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
     setCatMonthlyBudget("");
     setCatAnnualBudget("");
     setCatEmoji(type === "income" ? "💰" : "🏷️");
+    setCatIsInvestment(false);
     setActiveModal("category");
   };
 
@@ -318,6 +380,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
     setCatMonthlyBudget(monthly > 0 ? String(monthly) : "");
     setCatAnnualBudget(monthly > 0 ? String(monthly * 12) : "");
     setCatEmoji(cat.emoji || "🏷️");
+    setCatIsInvestment(Boolean(cat.isInvestment || isCategoryInvestment(cat)));
     setActiveModal("category");
   };
 
@@ -327,6 +390,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
     if (!catName.trim()) return;
 
     const monthlyBudget = parseFloat(catMonthlyBudget) || 0;
+    const isInv = catType === "expense" ? Boolean(catIsInvestment) : false;
 
     if (editingCategoryId) {
       // Update existing category (predefined or custom)
@@ -339,6 +403,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 type: catType,
                 budget: monthlyBudget,
                 emoji: catEmoji.trim() || "🏷️",
+                isInvestment: isInv,
               }
             : c
         )
@@ -351,6 +416,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
         type: catType,
         budget: monthlyBudget,
         emoji: catEmoji.trim() || (catType === "income" ? "💰" : "🏷️"),
+        isInvestment: isInv,
       };
       setCategories((prev) => [...prev, newCat]);
     }
@@ -360,6 +426,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
     setCatName("");
     setCatMonthlyBudget("");
     setCatAnnualBudget("");
+    setCatIsInvestment(false);
   };
 
   // Delete Category
@@ -447,13 +514,25 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const totalAnnualIncomeTarget = totalMonthlyIncomeTarget * 12;
 
   const plannedMonthlySurplus = Math.max(0, totalMonthlyIncomeTarget - totalMonthlyBudget);
+  const plannedWarChest = Math.round(plannedMonthlySurplus * (allocations.warChestPct / 100));
+  const plannedEquity = Math.round(plannedMonthlySurplus * (allocations.equityPct / 100));
+  const plannedEmergency = Math.round(plannedMonthlySurplus * (allocations.emergencyPct / 100));
 
-  // Donut Chart Data
-  const donutData = [
-    { name: "Trading War Chest (45%)", value: monthlyStats.warChest || 1, color: "var(--color-gold)" },
-    { name: "Equity Portfolio (35%)", value: monthlyStats.equityPortfolio || 1, color: "var(--color-win-text)" },
-    { name: "Emergency Buffer (20%)", value: monthlyStats.emergencyBuffer || 1, color: "var(--color-info)" },
-  ];
+  const totalCompoundedThisMonth = (monthlyStats.warChest || 0) + (monthlyStats.equityPortfolio || 0) + (monthlyStats.emergencyBuffer || 0);
+  const hasActualCompounding = totalCompoundedThisMonth > 0;
+
+  // Donut Chart Data (Uses live compounding when active, or planned target partitions when starting fresh)
+  const donutData = hasActualCompounding
+    ? [
+        { name: `Trading War Chest (${allocations.warChestPct}%)`, value: monthlyStats.warChest || (monthlyStats.equityPortfolio > 0 ? 0.001 : 1), color: "var(--color-gold)" },
+        { name: "Equity Portfolio", value: monthlyStats.equityPortfolio || 0.001, color: "var(--color-win-text)" },
+        { name: `Emergency Buffer (${allocations.emergencyPct}%)`, value: monthlyStats.emergencyBuffer || (monthlyStats.equityPortfolio > 0 ? 0.001 : 1), color: "var(--color-info)" },
+      ]
+    : [
+        { name: `Target War Chest (${allocations.warChestPct}%)`, value: plannedWarChest || 45, color: "var(--color-gold)" },
+        { name: `Target Equity (${allocations.equityPct}%)`, value: plannedEquity || 35, color: "var(--color-win-text)" },
+        { name: `Target Emergency (${allocations.emergencyPct}%)`, value: plannedEmergency || 20, color: "var(--color-info)" },
+      ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -605,6 +684,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               </span>
             )}
           </div>
+          {monthlyStats.investmentExpense > 0 && (
+            <div style={{ fontSize: 10.5, color: "var(--color-win-text)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <span>↳</span>
+              <span><strong>{fmtINR(monthlyStats.investmentExpense)}</strong> into Equity Portfolio 📈</span>
+            </div>
+          )}
         </div>
 
         {/* Net Monthly Surplus */}
@@ -632,6 +717,11 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
           <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
             Planned: <span className="mono" style={{ fontWeight: 650, color: "var(--color-gold)" }}>{fmtINR(plannedMonthlySurplus)}/mo</span> surplus
           </div>
+          {monthlyStats.investmentExpense > 0 && (
+            <div style={{ fontSize: 10.5, color: "var(--color-win-text)", marginTop: 4 }}>
+              Total Wealth Built: <strong className="mono">{fmtSigned(monthlyStats.netSurplus + monthlyStats.investmentExpense)}</strong>
+            </div>
+          )}
         </div>
 
         {/* Total Liquid Net Worth (Bank 1 + Bank 2 + Cash) */}
@@ -973,7 +1063,9 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 Wealth Compounding
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>Automatic surplus partition rule</div>
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                {hasActualCompounding ? "Live surplus & investment partition" : "Target planned surplus partition"}
+              </div>
             </div>
             <span
               style={{
@@ -1023,12 +1115,30 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               <span className="mono" style={{ fontWeight: 700, color: "var(--color-gold)" }}>{fmtINR(monthlyStats.warChest)}</span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-win-text)" }} />
-                <span style={{ color: "var(--text-secondary)" }}>Equity Portfolio ({allocations.equityPct}%):</span>
+            {/* Equity Portfolio with Investment Breakdown */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-win-text)" }} />
+                  <span style={{ color: "var(--text-secondary)", fontWeight: 650 }}>Equity Portfolio:</span>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span className="mono" style={{ fontWeight: 700, color: "var(--color-win-text)", fontSize: 13 }}>
+                    {fmtINR(monthlyStats.equityPortfolio)}
+                  </span>
+                </div>
               </div>
-              <span className="mono" style={{ fontWeight: 700, color: "var(--color-win-text)" }}>{fmtINR(monthlyStats.equityPortfolio)}</span>
+              {monthlyStats.investmentExpense > 0 && (
+                <div style={{ fontSize: 10, color: "var(--color-win-text)", textAlign: "right", opacity: 0.9 }}>
+                  {fmtINR(monthlyStats.investmentExpense)} expense investments
+                  {monthlyStats.surplusEquityShare > 0 ? ` + ${fmtINR(monthlyStats.surplusEquityShare)} surplus` : ""}
+                </div>
+              )}
+              {monthlyStats.equityPortfolio === 0 && (
+                <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
+                  Target: {fmtINR(plannedEquity)}/mo
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
@@ -1039,6 +1149,37 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               <span className="mono" style={{ fontWeight: 700, color: "var(--color-info-text)" }}>{fmtINR(monthlyStats.emergencyBuffer)}</span>
             </div>
           </div>
+
+          {/* Active Stock Holdings Integration Banner */}
+          {(holdingsCurrentValue > 0 || holdingsInvested > 0) && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 5 }}>
+                <span>📈</span>
+                <span style={{ fontWeight: 600 }}>Active Equity Holdings:</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-win-text)" }}>
+                  {fmtINR(holdingsCurrentValue || holdingsInvested)}
+                </div>
+                {holdingsInvested > 0 && (
+                  <div style={{ fontSize: 9.5, color: "var(--text-muted)" }}>
+                    Invested: {fmtINR(holdingsInvested)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Card: Expense Categories with Progress Bars & Annual Toggle */}
@@ -1135,6 +1276,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               const displayBudget = isAnnual ? annualBudget : monthlyBudget;
               const pct = displayBudget > 0 ? Math.min(100, Math.round((displaySpent / displayBudget) * 100)) : 0;
               const isOver = displayBudget > 0 && displaySpent > displayBudget;
+              const isInv = isCategoryInvestment(cat);
 
               return (
                 <div key={cat.id}>
@@ -1144,6 +1286,21 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                       <span style={{ fontSize: 12.5, fontWeight: 650, color: "var(--text-main)" }}>
                         {cat.name}
                       </span>
+                      {isInv && (
+                        <span
+                          style={{
+                            fontSize: 9.5,
+                            padding: "1px 5px",
+                            borderRadius: 4,
+                            background: "var(--color-win-soft)",
+                            color: "var(--color-win-text)",
+                            fontWeight: 700,
+                          }}
+                          title="This category builds wealth and routes directly into your Equity Portfolio"
+                        >
+                          📈 Compounding
+                        </span>
+                      )}
                       <button
                         onClick={() => openEditCategoryModal(cat)}
                         style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
@@ -1154,7 +1311,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ textAlign: "right" }}>
-                        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isOver ? "var(--color-loss-text)" : "var(--text-main)" }}>
+                        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isInv ? "var(--color-win-text)" : isOver ? "var(--color-loss-text)" : "var(--text-main)" }}>
                           {fmtINR(displaySpent)} / {fmtINR(displayBudget)}
                         </span>
                         <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
@@ -1174,13 +1331,17 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   </div>
 
                   {/* Progress Bar */}
-                  <div style={{ width: "100%", height: 6, borderRadius: 4, background: "rgba(229, 184, 105, 0.1)", overflow: "hidden" }}>
+                  <div style={{ width: "100%", height: 6, borderRadius: 4, background: isInv ? "rgba(16, 185, 129, 0.12)" : "rgba(229, 184, 105, 0.1)", overflow: "hidden" }}>
                     <div
                       style={{
                         width: `${pct}%`,
                         height: "100%",
                         borderRadius: 4,
-                        background: isOver
+                        background: isInv
+                          ? pct >= 100
+                            ? "linear-gradient(90deg, var(--color-win) 0%, var(--color-gold) 100%)"
+                            : "linear-gradient(90deg, var(--color-win-text) 0%, var(--color-win) 100%)"
+                          : isOver
                           ? "var(--color-loss)"
                           : pct >= 85
                           ? "linear-gradient(90deg, var(--color-gold) 0%, #F59E0B 100%)"
@@ -1315,6 +1476,11 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                             <span>{cat?.emoji || "🏷️"}</span>
                             <span>{cat?.name || tx.categoryId}</span>
+                            {isExpense && isCategoryInvestment(cat) && (
+                              <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 4, background: "var(--color-win-soft)", color: "var(--color-win-text)", fontWeight: 700 }} title="Routes into Equity Portfolio">
+                                📈 Equity
+                              </span>
+                            )}
                           </span>
                         )}
                       </td>
@@ -1426,10 +1592,16 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   >
                     {(activeModal === "income" ? incomeCategories : expenseCategories).map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.emoji} {c.name}
+                        {c.emoji} {c.name} {c.type === "expense" && isCategoryInvestment(c) ? "📈 [Compounding Asset]" : ""}
                       </option>
                     ))}
                   </select>
+                  {activeModal === "expense" && isCategoryInvestment(categories.find((c) => c.id === formCategory)) && (
+                    <div style={{ fontSize: 11, color: "var(--color-win-text)", marginTop: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                      <span>📈</span>
+                      <span><strong>Wealth Compounding:</strong> This outflow will be added directly into your Equity Portfolio.</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1768,6 +1940,41 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   required
                 />
               </div>
+
+              {catType === "expense" && (
+                <div
+                  style={{
+                    background: "var(--bg-elevated)",
+                    padding: 12,
+                    borderRadius: 8,
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "var(--text-main)",
+                      fontWeight: 650,
+                      margin: 0,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={catIsInvestment}
+                      onChange={(e) => setCatIsInvestment(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "var(--color-win)" }}
+                    />
+                    <span>📈 Mark as <strong>Compounding Investment</strong> (Routes into Equity Portfolio)</span>
+                  </label>
+                  <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 4, marginLeft: 24, lineHeight: 1.35 }}>
+                    When checked, expenses logged under this category (like SIPs, stocks, mutual funds, gold) will be added directly into your Equity Portfolio in the Wealth Compounding engine instead of pure consumption burn.
+                  </div>
+                </div>
+              )}
 
               <div
                 style={{
