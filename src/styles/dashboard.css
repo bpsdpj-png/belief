@@ -35,6 +35,11 @@
   --color-loss-soft: rgba(244, 63, 94, 0.12);
   --color-loss-border: rgba(244, 63, 94, 0.28);
 
+  --color-info: #38BDF8;
+  --color-info-text: #38BDF8;
+  --color-info-soft: rgba(56, 189, 248, 0.14);
+  --color-info-border: rgba(56, 189, 248, 0.32);
+
   --chart-grid: rgba(229, 184, 105, 0.06);
   --chart-tooltip-bg: #0C162D;
   --chart-tooltip-border: rgba(229, 184, 105, 0.35);
@@ -80,6 +85,11 @@
   --color-loss-text: #B91C1C;
   --color-loss-soft: rgba(220, 38, 38, 0.08);
   --color-loss-border: rgba(220, 38, 38, 0.25);
+
+  --color-info: #0284C7;
+  --color-info-text: #0284C7;
+  --color-info-soft: rgba(2, 132, 199, 0.08);
+  --color-info-border: rgba(2, 132, 199, 0.25);
 
   /* Charts in Light Mode */
   --chart-grid: rgba(31, 42, 68, 0.07);
@@ -378,19 +388,17 @@ button:active {
 /* Tab Pills */
 .tab-pills-container {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 5px;
   background: rgba(0, 0, 0, 0.25);
   padding: 4px;
   border-radius: 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
 }
 
 [data-theme="light"] .tab-pills-container {
   background: #EFE8DC;
   border: 1px solid rgba(198, 167, 94, 0.3);
-  padding: 5px;
+  padding: 4px;
 }
 
 .tab-pills-container::-webkit-scrollbar {
@@ -398,9 +406,9 @@ button:active {
 }
 
 .tab-pill {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-secondary);
   background: transparent;
@@ -410,7 +418,7 @@ button:active {
   transition: all 0.15s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 [data-theme="light"] .tab-pill {

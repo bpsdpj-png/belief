@@ -12,7 +12,7 @@ import * as XLSX from "xlsx";
 const DEFAULT_ACCOUNTS = {
   bank1: { id: "bank1", name: "Primary Bank 1", openingBalance: 150000, color: "var(--color-win-text)" },
   bank2: { id: "bank2", name: "Primary Bank 2", openingBalance: 100000, color: "var(--color-gold)" },
-  cash: { id: "cash", name: "Cash in Hand", openingBalance: 25000, color: "#38BDF8" },
+  cash: { id: "cash", name: "Cash in Hand", openingBalance: 25000, color: "var(--color-info-text)" },
 };
 
 const DEFAULT_CATEGORIES = [
@@ -347,7 +347,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const donutData = [
     { name: "Trading War Chest (45%)", value: monthlyStats.warChest || 1, color: "var(--color-gold)" },
     { name: "Equity Portfolio (35%)", value: monthlyStats.equityPortfolio || 1, color: "var(--color-win-text)" },
-    { name: "Emergency Buffer (20%)", value: monthlyStats.emergencyBuffer || 1, color: "#38BDF8" },
+    { name: "Emergency Buffer (20%)", value: monthlyStats.emergencyBuffer || 1, color: "var(--color-info)" },
   ];
 
   return (
@@ -540,14 +540,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
 
       {/* 3. Account Balances Strip (Bank 1, Bank 2, Cash + Inter-Transfer) */}
       <div
-        className="glass-card"
+        className="glass-card hero-plan-card"
         style={{
-          padding: 16,
-          background: "linear-gradient(135deg, rgba(12, 22, 45, 0.95) 0%, #060B18 100%)",
-          border: "1px solid rgba(229, 184, 105, 0.2)",
+          padding: 18,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Building2 size={16} color="var(--color-gold)" />
             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -613,9 +611,9 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 gap: 5,
                 padding: "6px 12px",
                 borderRadius: 6,
-                background: "rgba(56, 189, 248, 0.12)",
-                border: "1px solid rgba(56, 189, 248, 0.3)",
-                color: "#38BDF8",
+                background: "var(--color-info-soft)",
+                border: "1px solid var(--color-info-border)",
+                color: "var(--color-info-text)",
                 fontSize: 11.5,
                 fontWeight: 650,
                 cursor: "pointer",
@@ -649,7 +647,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
         {/* 3 Account Cards Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
           {/* Bank 1 Card */}
-          <div style={{ background: "rgba(12, 22, 45, 0.7)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: 10, padding: 14 }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--color-win-border)", borderRadius: 10, padding: 14, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Building2 size={14} color="var(--color-win-text)" />
@@ -674,7 +672,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
           </div>
 
           {/* Bank 2 Card */}
-          <div style={{ background: "rgba(12, 22, 45, 0.7)", border: "1px solid rgba(229, 184, 105, 0.3)", borderRadius: 10, padding: 14 }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--color-gold-border)", borderRadius: 10, padding: 14, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Building2 size={14} color="var(--color-gold)" />
@@ -699,10 +697,10 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
           </div>
 
           {/* Cash Wallet Card */}
-          <div style={{ background: "rgba(12, 22, 45, 0.7)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: 10, padding: 14 }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--color-info-border)", borderRadius: 10, padding: 14, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Banknote size={14} color="#38BDF8" />
+                <Banknote size={14} color="var(--color-info-text)" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)" }}>
                   {accounts.cash?.name || "Cash in Hand"}
                 </span>
@@ -715,7 +713,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 <Pencil size={12} />
               </button>
             </div>
-            <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: "#38BDF8" }}>
+            <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: "var(--color-info-text)" }}>
               {fmtINR(accountBalances.cash)}
             </div>
             <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -766,7 +764,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                     alignItems: "center",
                     padding: "10px 12px",
                     borderRadius: 8,
-                    background: "rgba(12, 22, 45, 0.6)",
+                    background: "var(--bg-elevated)",
                     border: "1px solid var(--border-subtle)",
                   }}
                 >
@@ -852,10 +850,10 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#38BDF8" }} />
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-info-text)" }} />
                 <span style={{ color: "var(--text-secondary)" }}>Emergency Buffer ({allocations.emergencyPct}%):</span>
               </div>
-              <span className="mono" style={{ fontWeight: 700, color: "#38BDF8" }}>{fmtINR(monthlyStats.emergencyBuffer)}</span>
+              <span className="mono" style={{ fontWeight: 700, color: "var(--color-info-text)" }}>{fmtINR(monthlyStats.emergencyBuffer)}</span>
             </div>
           </div>
         </div>
@@ -1034,12 +1032,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                               ? "var(--color-win-soft)"
                               : isExpense
                               ? "var(--color-loss-soft)"
-                              : "rgba(56, 189, 248, 0.12)",
+                              : "var(--color-info-soft)",
                             color: isIncome
                               ? "var(--color-win-text)"
                               : isExpense
                               ? "var(--color-loss-text)"
-                              : "#38BDF8",
+                              : "var(--color-info-text)",
                           }}
                         >
                           {tx.type}
@@ -1047,7 +1045,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                       </td>
                       <td style={{ padding: "10px 12px" }}>
                         {isTransfer ? (
-                          <span style={{ color: "#38BDF8", fontSize: 12, fontWeight: 650 }}>
+                          <span style={{ color: "var(--color-info-text)", fontSize: 12, fontWeight: 650 }}>
                             {accounts[tx.accountId]?.name} ➔ {accounts[tx.targetAccountId]?.name}
                           </span>
                         ) : (
@@ -1071,7 +1069,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                             ? "var(--color-win-text)"
                             : isExpense
                             ? "var(--color-loss-text)"
-                            : "#38BDF8",
+                            : "var(--color-info-text)",
                         }}
                       >
                         {isIncome ? "+" : isExpense ? "-" : "⇄"}
@@ -1118,29 +1116,28 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
       {/* 6. MODALS FOR TRANSACTIONS & TRANSFERS */}
       {(activeModal === "income" || activeModal === "expense" || activeModal === "transfer") && (
         <div
+          className="modal-backdrop"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(6px)",
+            zIndex: 1000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 9999,
             padding: 16,
           }}
         >
           <div
-            className="glass-card"
+            className="glass-card mobile-modal"
             style={{
               width: "100%",
               maxWidth: 440,
-              padding: 22,
-              background: "#0C162D",
-              border: "1px solid rgba(229, 184, 105, 0.35)",
+              padding: 24,
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
                 {activeModal === "income" && "💰 Log Income Stream"}
                 {activeModal === "expense" && "💳 Log Expense Outflow"}
@@ -1148,7 +1145,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               </div>
               <button
                 onClick={() => setActiveModal(null)}
-                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
               >
                 <X size={18} />
               </button>
@@ -1243,12 +1240,14 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   type="button"
                   onClick={() => setActiveModal(null)}
                   style={{
-                    padding: "8px 14px",
-                    borderRadius: 6,
+                    padding: "8px 16px",
+                    borderRadius: 8,
                     background: "transparent",
                     border: "1px solid var(--border-subtle)",
                     color: "var(--text-secondary)",
                     cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
                   }}
                 >
                   Cancel
@@ -1256,12 +1255,13 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 <button
                   type="submit"
                   style={{
-                    padding: "8px 18px",
-                    borderRadius: 6,
+                    padding: "8px 20px",
+                    borderRadius: 8,
                     background: "var(--color-gold)",
                     border: "none",
-                    color: "#0B132B",
+                    color: "#081022",
                     fontWeight: 700,
+                    fontSize: 13,
                     cursor: "pointer",
                   }}
                 >
@@ -1276,33 +1276,32 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
       {/* 7. MODAL: EDIT ACCOUNT (RENAME & OPENING BALANCE) */}
       {activeModal === "edit_account" && editAccountTarget && (
         <div
+          className="modal-backdrop"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(6px)",
+            zIndex: 1000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 9999,
             padding: 16,
           }}
         >
           <div
-            className="glass-card"
+            className="glass-card mobile-modal"
             style={{
               width: "100%",
               maxWidth: 420,
-              padding: 22,
-              background: "#0C162D",
-              border: "1px solid rgba(229, 184, 105, 0.35)",
+              padding: 24,
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
                 Edit Account Details
               </div>
-              <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+              <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}>
                 <X size={18} />
               </button>
             </div>
@@ -1338,12 +1337,14 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   type="button"
                   onClick={() => setActiveModal(null)}
                   style={{
-                    padding: "8px 14px",
-                    borderRadius: 6,
+                    padding: "8px 16px",
+                    borderRadius: 8,
                     background: "transparent",
                     border: "1px solid var(--border-subtle)",
                     color: "var(--text-secondary)",
                     cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
                   }}
                 >
                   Cancel
@@ -1351,12 +1352,13 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 <button
                   type="submit"
                   style={{
-                    padding: "8px 18px",
-                    borderRadius: 6,
+                    padding: "8px 20px",
+                    borderRadius: 8,
                     background: "var(--color-gold)",
                     border: "none",
-                    color: "#0B132B",
+                    color: "#081022",
                     fontWeight: 700,
+                    fontSize: 13,
                     cursor: "pointer",
                   }}
                 >
@@ -1371,33 +1373,32 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
       {/* 8. MODAL: CREATE CUSTOM CATEGORY */}
       {activeModal === "new_category" && (
         <div
+          className="modal-backdrop"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(6px)",
+            zIndex: 1000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 9999,
             padding: 16,
           }}
         >
           <div
-            className="glass-card"
+            className="glass-card mobile-modal"
             style={{
               width: "100%",
               maxWidth: 420,
-              padding: 22,
-              background: "#0C162D",
-              border: "1px solid rgba(229, 184, 105, 0.35)",
+              padding: 24,
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
                 Add Custom Category
               </div>
-              <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+              <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}>
                 <X size={18} />
               </button>
             </div>
@@ -1450,12 +1451,14 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                   type="button"
                   onClick={() => setActiveModal(null)}
                   style={{
-                    padding: "8px 14px",
-                    borderRadius: 6,
+                    padding: "8px 16px",
+                    borderRadius: 8,
                     background: "transparent",
                     border: "1px solid var(--border-subtle)",
                     color: "var(--text-secondary)",
                     cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
                   }}
                 >
                   Cancel
@@ -1463,12 +1466,13 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 <button
                   type="submit"
                   style={{
-                    padding: "8px 18px",
-                    borderRadius: 6,
+                    padding: "8px 20px",
+                    borderRadius: 8,
                     background: "var(--color-gold)",
                     border: "none",
-                    color: "#0B132B",
+                    color: "#081022",
                     fontWeight: 700,
+                    fontSize: 13,
                     cursor: "pointer",
                   }}
                 >
