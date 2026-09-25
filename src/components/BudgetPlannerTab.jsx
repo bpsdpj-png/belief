@@ -27,10 +27,10 @@ const DEFAULT_CATEGORIES = [
   { id: "shopping", name: "Shopping & Personal", budget: 10000, type: "expense", emoji: "🛍️" },
 
   // Income Categories
-  { id: "trading_profit", name: "Trading Profits", budget: 0, type: "income", emoji: "📈" },
-  { id: "salary_business", name: "Salary / Business", budget: 0, type: "income", emoji: "💼" },
-  { id: "dividends", name: "Dividends & Returns", budget: 0, type: "income", emoji: "💰" },
-  { id: "other_income", name: "Other Inflows", budget: 0, type: "income", emoji: "🪙" },
+  { id: "trading_profit", name: "Trading Profits", budget: 150000, type: "income", emoji: "📈" },
+  { id: "salary_business", name: "Salary / Business", budget: 100000, type: "income", emoji: "💼" },
+  { id: "dividends", name: "Dividends & Returns", budget: 25000, type: "income", emoji: "💰" },
+  { id: "other_income", name: "Other Inflows", budget: 15000, type: "income", emoji: "🪙" },
 ];
 
 const EMOJI_GROUPS = {
@@ -441,6 +441,13 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   }, [expenseCategories]);
   const totalAnnualBudget = totalMonthlyBudget * 12;
 
+  const totalMonthlyIncomeTarget = useMemo(() => {
+    return incomeCategories.reduce((sum, c) => sum + (Number(c.budget) || 0), 0);
+  }, [incomeCategories]);
+  const totalAnnualIncomeTarget = totalMonthlyIncomeTarget * 12;
+
+  const plannedMonthlySurplus = Math.max(0, totalMonthlyIncomeTarget - totalMonthlyBudget);
+
   // Donut Chart Data
   const donutData = [
     { name: "Trading War Chest (45%)", value: monthlyStats.warChest || 1, color: "var(--color-gold)" },
@@ -568,7 +575,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             {fmtINR(monthlyStats.totalInflow)}
           </div>
           <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
-            Trading profits + external streams
+            Target: <span className="mono" style={{ fontWeight: 650, color: "var(--color-win-text)" }}>{fmtINR(totalMonthlyIncomeTarget)}/mo</span>
+            {totalMonthlyIncomeTarget > 0 && (
+              <span style={{ fontSize: 10, color: monthlyStats.totalInflow >= totalMonthlyIncomeTarget ? "var(--color-win-text)" : "var(--text-muted)", marginLeft: 4 }}>
+                ({((monthlyStats.totalInflow / totalMonthlyIncomeTarget) * 100).toFixed(0)}% reached)
+              </span>
+            )}
           </div>
         </div>
 
@@ -586,7 +598,12 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             {fmtINR(monthlyStats.totalExpense)}
           </div>
           <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
-            Living costs & trading overheads
+            Budget: <span className="mono" style={{ fontWeight: 650, color: "var(--color-loss-text)" }}>{fmtINR(totalMonthlyBudget)}/mo</span>
+            {totalMonthlyBudget > 0 && (
+              <span style={{ fontSize: 10, color: monthlyStats.totalExpense > totalMonthlyBudget ? "var(--color-loss-text)" : "var(--text-muted)", marginLeft: 4 }}>
+                ({((monthlyStats.totalExpense / totalMonthlyBudget) * 100).toFixed(0)}% spent)
+              </span>
+            )}
           </div>
         </div>
 
@@ -613,7 +630,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             {fmtSigned(monthlyStats.netSurplus)}
           </div>
           <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
-            Capital available for wealth allocation
+            Planned: <span className="mono" style={{ fontWeight: 650, color: "var(--color-gold)" }}>{fmtINR(plannedMonthlySurplus)}/mo</span> surplus
           </div>
         </div>
 
@@ -823,23 +840,27 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
 
       {/* 4. Middle Grid: Incomes Breakdown, Wealth Donut, and Expense Categories */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-        {/* Left Card: Income Sources Breakdown */}
+        {/* Left Card: Income Sources Breakdown & Targets */}
         <div className="glass-card" style={{ padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Income Streams
+                Income Streams & Targets
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>This month's inflows by source</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                Planned: <span className="mono" style={{ fontWeight: 650, color: "var(--color-win-text)" }}>{fmtINR(totalMonthlyIncomeTarget)}/mo</span>
+                {" "}&bull;{" "}
+                <span className="mono" style={{ fontWeight: 650, color: "var(--text-main)" }}>{fmtINR(totalAnnualIncomeTarget)}/yr</span>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => openNewCategoryModal("income")}
                 style={{
                   background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
                   color: "var(--color-gold)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
                 }}
-                title="Add New Custom Income Stream"
+                title="Add New Custom Income Stream & Target"
               >
                 + Stream
               </button>
@@ -859,51 +880,85 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 310, overflowY: "auto", paddingRight: 4 }}>
             {incomeCategories.map((cat) => {
-              const catTotal = monthlyTransactions
+              const isAnnual = budgetViewMode === "annual";
+              const currentYearPrefix = selectedMonth ? selectedMonth.slice(0, 4) : new Date().getFullYear().toString();
+
+              // Monthly values
+              const monthlyInflow = monthlyTransactions
                 .filter((tx) => tx.type === "income" && tx.categoryId === cat.id)
                 .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+              const monthlyTarget = cat.budget || 0;
+
+              // Annual values
+              const annualInflow = transactions
+                .filter((tx) => tx.type === "income" && tx.categoryId === cat.id && tx.date.startsWith(currentYearPrefix))
+                .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+              const annualTarget = monthlyTarget * 12;
+
+              const displayActual = isAnnual ? annualInflow : monthlyInflow;
+              const displayTarget = isAnnual ? annualTarget : monthlyTarget;
+              const pct = displayTarget > 0 ? Math.round((displayActual / displayTarget) * 100) : 0;
+              const isMet = displayTarget > 0 && displayActual >= displayTarget;
 
               return (
-                <div
-                  key={cat.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 16 }}>{cat.emoji}</span>
-                    <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-main)" }}>
-                      {cat.name}
-                    </span>
-                    <button
-                      onClick={() => openEditCategoryModal(cat)}
-                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
-                      title="Edit Category Name & Emoji"
-                    >
-                      <Pencil size={11} />
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: catTotal > 0 ? "var(--color-win-text)" : "var(--text-muted)" }}>
-                      {fmtINR(catTotal)}
-                    </div>
-                    {incomeCategories.length > 1 && (
+                <div key={cat.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>{cat.emoji}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 650, color: "var(--text-main)" }}>
+                        {cat.name}
+                      </span>
                       <button
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
-                        title="Delete Category"
+                        onClick={() => openEditCategoryModal(cat)}
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px 4px", display: "inline-flex", alignItems: "center" }}
+                        title="Edit Stream Name, Emoji, or Income Target"
                       >
-                        <X size={11} />
+                        <Pencil size={11} />
                       </button>
-                    )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: isMet ? "var(--color-win-text)" : displayActual > 0 ? "var(--text-main)" : "var(--text-muted)" }}>
+                          {fmtINR(displayActual)} / {fmtINR(displayTarget)}
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
+                          {isAnnual ? `(${fmtINR(monthlyTarget)}/mo)` : `(${fmtINR(annualTarget)}/yr)`}
+                        </span>
+                      </div>
+                      {isMet && (
+                        <span style={{ fontSize: 9.5, padding: "1px 5px", borderRadius: 4, background: "var(--color-win-soft)", color: "var(--color-win-text)", fontWeight: 700 }}>
+                          ✓ Met
+                        </span>
+                      )}
+                      {incomeCategories.length > 1 && (
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
+                          title="Delete Stream"
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Income Progress Bar */}
+                  <div style={{ width: "100%", height: 6, borderRadius: 4, background: "rgba(16, 185, 129, 0.12)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        width: `${Math.min(100, pct)}%`,
+                        height: "100%",
+                        borderRadius: 4,
+                        background: isMet
+                          ? "linear-gradient(90deg, var(--color-win) 0%, var(--color-gold) 100%)"
+                          : pct >= 50
+                          ? "linear-gradient(90deg, var(--color-info) 0%, var(--color-win-text) 100%)"
+                          : "var(--color-info)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
                   </div>
                 </div>
               );
@@ -1714,58 +1769,62 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
                 />
               </div>
 
-              {catType === "expense" && (
-                <div
-                  style={{
-                    background: "var(--bg-elevated)",
-                    padding: 14,
-                    borderRadius: 10,
-                    border: "1px solid var(--border-subtle)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      Budget Allocation (Auto-Divided)
-                    </span>
-                    <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--color-gold-soft)", color: "var(--color-gold)", fontWeight: 700 }}>
-                      ÷ 12 MONTHS
-                    </span>
-                  </div>
+              <div
+                style={{
+                  background: "var(--bg-elevated)",
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-gold)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {catType === "income" ? "Income Target Allocation (Auto-Divided)" : "Expense Budget Allocation (Auto-Divided)"}
+                  </span>
+                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--color-gold-soft)", color: "var(--color-gold)", fontWeight: 700 }}>
+                    ÷ 12 MONTHS
+                  </span>
+                </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div>
-                      <label style={{ fontSize: 10.5, marginBottom: 4 }}>Annual Budget (₹/yr)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 120000"
-                        value={catAnnualBudget}
-                        onChange={(e) => handleAnnualBudgetChange(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 10.5, marginBottom: 4 }}>Monthly Budget (₹/mo)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 10000"
-                        value={catMonthlyBudget}
-                        onChange={(e) => handleMonthlyBudgetChange(e.target.value)}
-                      />
-                    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 10.5, marginBottom: 4 }}>
+                      {catType === "income" ? "Annual Target (₹/yr)" : "Annual Budget (₹/yr)"}
+                    </label>
+                    <input
+                      type="number"
+                      placeholder={catType === "income" ? "e.g. 1800000" : "e.g. 120000"}
+                      value={catAnnualBudget}
+                      onChange={(e) => handleAnnualBudgetChange(e.target.value)}
+                    />
                   </div>
-
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-                    <span>💡</span>
-                    <span>
-                      {parseFloat(catAnnualBudget) > 0
-                        ? `₹${Number(catAnnualBudget).toLocaleString("en-IN")}/yr automatically divides into ₹${Number(catMonthlyBudget || 0).toLocaleString("en-IN")}/month`
-                        : "Enter annual budget to divide by 12, or enter monthly target directly."}
-                    </span>
+                  <div>
+                    <label style={{ fontSize: 10.5, marginBottom: 4 }}>
+                      {catType === "income" ? "Monthly Target (₹/mo)" : "Monthly Budget (₹/mo)"}
+                    </label>
+                    <input
+                      type="number"
+                      placeholder={catType === "income" ? "e.g. 150000" : "e.g. 10000"}
+                      value={catMonthlyBudget}
+                      onChange={(e) => handleMonthlyBudgetChange(e.target.value)}
+                    />
                   </div>
                 </div>
-              )}
+
+                <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                  <span>💡</span>
+                  <span>
+                    {parseFloat(catAnnualBudget) > 0
+                      ? `₹${Number(catAnnualBudget).toLocaleString("en-IN")}/yr automatically divides into ₹${Number(catMonthlyBudget || 0).toLocaleString("en-IN")}/month`
+                      : catType === "income"
+                      ? "Enter annual income target to divide by 12, or enter monthly target directly."
+                      : "Enter annual budget to divide by 12, or enter monthly target directly."}
+                  </span>
+                </div>
+              </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                 <div>
