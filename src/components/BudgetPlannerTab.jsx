@@ -33,6 +33,15 @@ const DEFAULT_CATEGORIES = [
   { id: "other_income", name: "Other Inflows", budget: 0, type: "income", emoji: "🪙" },
 ];
 
+const EMOJI_GROUPS = {
+  "Finance": ["📈", "💰", "💵", "🪙", "💳", "🏦", "💼", "💎", "📊", "🎯", "🚀", "🧾", "📉"],
+  "Home & Food": ["🏠", "🛒", "🥗", "☕", "🍽️", "🍕", "🥦", "🍎", "💡", "🔌", "🛋️", "🧹", "🚿"],
+  "Transit": ["🚗", "⛽", "🚕", "🏍️", "✈️", "🚆", "🛳️", "🚲", "🧳", "🗺️", "🏎️", "🅿️"],
+  "Fitness & Health": ["🏏", "🏋️", "🧘", "💊", "🩺", "🏃", "⚽", "🎾", "🥊", "🚴", "🏥", "🥛"],
+  "Tech & Tools": ["💻", "🖥️", "📱", "⚡", "🤖", "🔒", "🎧", "🎮", "📷", "📡", "🌐", "⌨️"],
+  "Lifestyle": ["✨", "🛍️", "🎬", "🎵", "🎉", "🎁", "👔", "👗", "🕶️", "🍻", "🏖️", "🌴", "📚"],
+};
+
 export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCapital = 0 }) {
   // 1. Persistent State
   const [accounts, setAccounts] = useState(() => {
@@ -101,6 +110,7 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
   const [catMonthlyBudget, setCatMonthlyBudget] = useState("");
   const [catAnnualBudget, setCatAnnualBudget] = useState("");
   const [catEmoji, setCatEmoji] = useState("🏷️");
+  const [selectedEmojiGroup, setSelectedEmojiGroup] = useState("Finance");
 
   // Account Edit Form Fields
   const [accName, setAccName] = useState("");
@@ -1624,33 +1634,68 @@ export default function BudgetPlannerTab({ trades = [], todayPnl = 0, currentCap
               </div>
 
               <div>
-                <label>Emoji & Icon</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ margin: 0 }}>Category Emoji & Icon</label>
+                  <span style={{ fontSize: 10.5, color: "var(--color-gold)", fontWeight: 650 }}>
+                    Mac Shortcut: ⌘ + ⌃ + Space
+                  </span>
+                </div>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <input
                     type="text"
                     value={catEmoji}
                     onChange={(e) => setCatEmoji(e.target.value)}
-                    style={{ textAlign: "center", fontSize: 20, width: 64, flexShrink: 0 }}
+                    style={{ textAlign: "center", fontSize: 24, width: 64, height: 46, flexShrink: 0, borderRadius: 8 }}
+                    title="Current Category Emoji"
                   />
-                  <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                    Select a quick emoji below or type any custom emoji
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                    Click any emoji below or press <kbd style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "2px 5px", fontSize: 10, color: "var(--text-main)", fontWeight: 700 }}>⌘ + ⌃ + Space</kbd> to open Mac emoji palette
                   </div>
                 </div>
-                {/* Quick Emoji Chips */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                  {["🏠", "🥗", "🚗", "🏏", "💻", "✨", "💊", "🛍️", "✈️", "📚", "📈", "💼", "💰", "🪙", "⚡", "🎁", "🛡️", "🏷️"].map((em) => (
+
+                {/* Emoji Group Tabs */}
+                <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 6, marginBottom: 8, scrollbarWidth: "none" }}>
+                  {Object.keys(EMOJI_GROUPS).map((group) => (
+                    <button
+                      key={group}
+                      type="button"
+                      onClick={() => setSelectedEmojiGroup(group)}
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: 10.5,
+                        fontWeight: 650,
+                        borderRadius: 6,
+                        border: "1px solid",
+                        borderColor: selectedEmojiGroup === group ? "var(--color-gold)" : "var(--border-subtle)",
+                        background: selectedEmojiGroup === group ? "var(--color-gold-soft)" : "var(--bg-elevated)",
+                        color: selectedEmojiGroup === group ? "var(--color-gold)" : "var(--text-secondary)",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {group}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Emojis in Selected Group */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, background: "var(--bg-elevated)", padding: 8, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                  {EMOJI_GROUPS[selectedEmojiGroup].map((em) => (
                     <button
                       key={em}
                       type="button"
                       onClick={() => setCatEmoji(em)}
                       style={{
-                        background: catEmoji === em ? "var(--color-gold-soft)" : "var(--bg-elevated)",
-                        border: catEmoji === em ? "1px solid var(--color-gold)" : "1px solid var(--border-subtle)",
+                        background: catEmoji === em ? "var(--color-gold-soft)" : "transparent",
+                        border: catEmoji === em ? "1px solid var(--color-gold)" : "1px solid transparent",
                         borderRadius: 6,
-                        padding: "3px 7px",
-                        fontSize: 14,
+                        padding: "4px 8px",
+                        fontSize: 16,
                         cursor: "pointer",
+                        transition: "transform 0.1s ease",
                       }}
+                      title={`Select ${em}`}
                     >
                       {em}
                     </button>
