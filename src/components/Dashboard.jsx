@@ -28,6 +28,7 @@ import {
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
 import PnLMountainClimber from "./PnLMountainClimber";
+import BudgetPlannerTab from "./BudgetPlannerTab";
 import { BHARAT_ACTIVITIES, getBharatActivityById } from "../data/bharatAvatar";
 import {
   playMeditationChime,
@@ -1365,6 +1366,7 @@ export default function Dashboard() {
           {[
             ["overview", "Overview", <TrendingUp size={14} />],
             ["trades", `Trade Log (${trades.length})`, <Briefcase size={14} />],
+            ["budget", "Budget Planner", <PiggyBank size={14} />],
             ["capital", "Capital & Ledger", <Wallet size={14} />],
             ["investments", `Equity Investments (${holdings.length})`, <Briefcase size={14} />],
             ["habits", "Daily Habits & SOP", <CheckCircle2 size={14} />],
@@ -1399,6 +1401,14 @@ export default function Dashboard() {
             startEditTrade={startEditTrade}
             deleteTrade={deleteTrade}
             setShowWithdrawForm={setShowWithdrawForm}
+          />
+        )}
+
+        {tab === "budget" && (
+          <BudgetPlannerTab
+            trades={trades}
+            todayPnl={stats.todayPnl}
+            currentCapital={stats.currentCapital}
           />
         )}
 
