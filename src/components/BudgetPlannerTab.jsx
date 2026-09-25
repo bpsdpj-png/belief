@@ -521,18 +521,25 @@ export default function BudgetPlannerTab({
   const totalCompoundedThisMonth = (monthlyStats.warChest || 0) + (monthlyStats.equityPortfolio || 0) + (monthlyStats.emergencyBuffer || 0);
   const hasActualCompounding = totalCompoundedThisMonth > 0;
 
-  // Donut Chart Data (Uses live compounding when active, or planned target partitions when starting fresh)
-  const donutData = hasActualCompounding
-    ? [
-        { name: `Trading War Chest (${allocations.warChestPct}%)`, value: monthlyStats.warChest || (monthlyStats.equityPortfolio > 0 ? 0.001 : 1), color: "var(--color-gold)" },
-        { name: "Equity Portfolio", value: monthlyStats.equityPortfolio || 0.001, color: "var(--color-win-text)" },
-        { name: `Emergency Buffer (${allocations.emergencyPct}%)`, value: monthlyStats.emergencyBuffer || (monthlyStats.equityPortfolio > 0 ? 0.001 : 1), color: "var(--color-info)" },
-      ]
+  // Donut Chart Data (Smooth single ring if only 1 category funded, or clean multi-split if several funded)
+  const activeCompoundingSlices = [
+    { name: `Trading War Chest (${allocations.warChestPct}%)`, value: monthlyStats.warChest || 0, color: "var(--color-gold)" },
+    { name: "Equity Portfolio", value: monthlyStats.equityPortfolio || 0, color: "var(--color-win-text)" },
+    { name: `Emergency Buffer (${allocations.emergencyPct}%)`, value: monthlyStats.emergencyBuffer || 0, color: "var(--color-info)" },
+  ].filter((s) => s.value > 0);
+
+  const donutData = activeCompoundingSlices.length > 0
+    ? activeCompoundingSlices
     : [
         { name: `Target War Chest (${allocations.warChestPct}%)`, value: plannedWarChest || 45, color: "var(--color-gold)" },
         { name: `Target Equity (${allocations.equityPct}%)`, value: plannedEquity || 35, color: "var(--color-win-text)" },
         { name: `Target Emergency (${allocations.emergencyPct}%)`, value: plannedEmergency || 20, color: "var(--color-info)" },
       ];
+
+  // Combined Equity Calculations (Active Stock Holdings + This Month's Added Investment)
+  const holdingsVal = Number(holdingsCurrentValue || holdingsInvested || 0);
+  const monthlyEquityVal = Number(monthlyStats.equityPortfolio || 0);
+  const totalCombinedEquity = holdingsVal + monthlyEquityVal;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1081,7 +1088,7 @@ export default function BudgetPlannerTab({
             </span>
           </div>
 
-          <div style={{ width: "100%", height: 160 }}>
+          <div style={{ width: "100%", height: 160, position: "relative" }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1090,7 +1097,7 @@ export default function BudgetPlannerTab({
                   cy="50%"
                   innerRadius={45}
                   outerRadius={70}
-                  paddingAngle={4}
+                  paddingAngle={donutData.length > 1 ? 4 : 0}
                   dataKey="value"
                 >
                   {donutData.map((entry, index) => (
@@ -1103,10 +1110,30 @@ export default function BudgetPlannerTab({
                 />
               </PieChart>
             </ResponsiveContainer>
+
+            {/* Sleek Center Metric inside Donut */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                {hasActualCompounding ? "This Month" : "Target"}
+              </span>
+              <span className="mono" style={{ fontSize: 14.5, fontWeight: 700, color: hasActualCompounding ? "var(--color-win-text)" : "var(--color-gold)" }}>
+                {fmtINR(hasActualCompounding ? totalCompoundedThisMonth : plannedMonthlySurplus)}
+              </span>
+            </div>
           </div>
 
-          {/* Allocation Breakdown Rows */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+          {/* Allocation Breakdown Rows (Monthly Flow) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 4 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-gold)" }} />
@@ -1115,30 +1142,21 @@ export default function BudgetPlannerTab({
               <span className="mono" style={{ fontWeight: 700, color: "var(--color-gold)" }}>{fmtINR(monthlyStats.warChest)}</span>
             </div>
 
-            {/* Equity Portfolio with Investment Breakdown */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-win-text)" }} />
-                  <span style={{ color: "var(--text-secondary)", fontWeight: 650 }}>Equity Portfolio:</span>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span className="mono" style={{ fontWeight: 700, color: "var(--color-win-text)", fontSize: 13 }}>
-                    {fmtINR(monthlyStats.equityPortfolio)}
-                  </span>
-                </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-win-text)" }} />
+                <span style={{ color: "var(--text-secondary)", fontWeight: 650 }}>Equity Added (This Month):</span>
               </div>
-              {monthlyStats.investmentExpense > 0 && (
-                <div style={{ fontSize: 10, color: "var(--color-win-text)", textAlign: "right", opacity: 0.9 }}>
-                  {fmtINR(monthlyStats.investmentExpense)} expense investments
-                  {monthlyStats.surplusEquityShare > 0 ? ` + ${fmtINR(monthlyStats.surplusEquityShare)} surplus` : ""}
-                </div>
-              )}
-              {monthlyStats.equityPortfolio === 0 && (
-                <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
-                  Target: {fmtINR(plannedEquity)}/mo
-                </div>
-              )}
+              <div style={{ textAlign: "right" }}>
+                <span className="mono" style={{ fontWeight: 700, color: "var(--color-win-text)", fontSize: 13 }}>
+                  +{fmtINR(monthlyStats.equityPortfolio)}
+                </span>
+                {monthlyStats.equityPortfolio === 0 && (
+                  <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
+                    (Target: {fmtINR(plannedEquity)}/mo)
+                  </span>
+                )}
+              </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
@@ -1150,33 +1168,96 @@ export default function BudgetPlannerTab({
             </div>
           </div>
 
-          {/* Active Stock Holdings Integration Banner */}
-          {(holdingsCurrentValue > 0 || holdingsInvested > 0) && (
+          {/* Unified Master Equity Standing Box (Active Holdings + Monthly Investment) */}
+          {holdingsVal > 0 && (
             <div
               style={{
-                marginTop: 12,
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
+                marginTop: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(229, 184, 105, 0.05) 100%)",
+                border: "1px solid rgba(16, 185, 129, 0.25)",
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                flexDirection: "column",
+                gap: 8,
               }}
             >
-              <div style={{ fontSize: 11, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 5 }}>
-                <span>📈</span>
-                <span style={{ fontWeight: 600 }}>Active Equity Holdings:</span>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-win-text)" }}>
-                  {fmtINR(holdingsCurrentValue || holdingsInvested)}
+              {/* Top row: Combined Total */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13 }}>📈</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Combined Equity Standing
+                  </span>
                 </div>
-                {holdingsInvested > 0 && (
-                  <div style={{ fontSize: 9.5, color: "var(--text-muted)" }}>
-                    Invested: {fmtINR(holdingsInvested)}
+                <span className="mono" style={{ fontSize: 14.5, fontWeight: 700, color: "var(--color-win-text)" }}>
+                  {fmtINR(totalCombinedEquity)}
+                </span>
+              </div>
+
+              {/* Visual Equation Card: Active Holdings + This Month Added = Total */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto 1fr",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--bg-elevated)",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                {/* Left Column: Existing Stock Holdings */}
+                <div>
+                  <div style={{ fontSize: 9.5, color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                    Active Holdings
                   </div>
-                )}
+                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-main)", marginTop: 2 }}>
+                    {fmtINR(holdingsVal)}
+                  </div>
+                  {holdingsInvested > 0 && (
+                    <div style={{ fontSize: 9.5, color: "var(--text-muted)" }}>
+                      Cost: {fmtINR(holdingsInvested)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Center Plus Badge */}
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: "var(--color-gold-soft)",
+                    color: "var(--color-gold)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: 12,
+                  }}
+                >
+                  +
+                </div>
+
+                {/* Right Column: This Month's Fresh Investment (SIP) */}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 9.5, color: "var(--color-win-text)", fontWeight: 700, textTransform: "uppercase" }}>
+                    Added This Month
+                  </div>
+                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-win-text)", marginTop: 2 }}>
+                    +{fmtINR(monthlyEquityVal)}
+                  </div>
+                  <div style={{ fontSize: 9.5, color: "var(--text-muted)" }}>
+                    {monthlyStats.investmentExpense > 0 ? "Expense Investment" : "Surplus Allocation"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Equation summary note */}
+              <div style={{ fontSize: 10, color: "var(--text-secondary)", textAlign: "center", opacity: 0.9 }}>
+                ₹{Number(Math.round(holdingsVal)).toLocaleString("en-IN")} holdings + ₹{Number(Math.round(monthlyEquityVal)).toLocaleString("en-IN")} new = <strong style={{ color: "var(--color-win-text)" }}>₹{Number(Math.round(totalCombinedEquity)).toLocaleString("en-IN")} Total</strong>
               </div>
             </div>
           )}
