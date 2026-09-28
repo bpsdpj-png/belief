@@ -1211,15 +1211,16 @@ export default function Dashboard() {
       }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {/* Logo & Brand */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{
-              width: 38, height: 38, borderRadius: 10,
+              width: 48, height: 48, borderRadius: 12,
               background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
-              border: "1px solid rgba(245, 158, 11, 0.35)",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-              display: "flex", alignItems: "center", justifyContent: "center"
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0
             }}>
-              <svg width={24} height={24} viewBox="0 0 40 40">
+              <svg width={30} height={30} viewBox="0 0 40 40">
                 <rect x={7} y={22} width={5} height={11} rx={1.5} fill="#D97706" />
                 <rect x={15} y={15} width={5} height={18} rx={1.5} fill="#F59E0B" />
                 <rect x={23} y={9} width={5} height={24} rx={1.5} fill="#FCD34D" />
@@ -1228,10 +1229,10 @@ export default function Dashboard() {
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span className="script-brand" style={{ fontSize: 26, color: "var(--color-gold)", lineHeight: 1 }}>Belief</span>
-                <span className="desktop-only" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", color: "var(--text-muted)", textTransform: "uppercase" }}>Institutional</span>
+                <span className="script-brand" style={{ fontSize: 34, color: "var(--color-gold)", lineHeight: 1 }}>Belief</span>
+                <span className="desktop-only" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.15em", color: "var(--text-muted)", textTransform: "uppercase" }}>Institutional</span>
               </div>
-              <div style={{ fontSize: 10.5, color: "var(--text-secondary)", fontWeight: 500, letterSpacing: "0.02em" }}>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500, letterSpacing: "0.02em", marginTop: 2 }}>
                 Trade with Conviction
               </div>
             </div>
