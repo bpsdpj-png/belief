@@ -128,12 +128,14 @@ export default function BudgetPlannerTab({
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [budgetViewMode, setBudgetViewMode] = useState("monthly"); // "monthly" | "annual"
 
   // Modals State
   const [activeModal, setActiveModal] = useState(null); // 'income' | 'expense' | 'transfer' | 'category' | 'edit_account'
   const [editAccountTarget, setEditAccountTarget] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [editingTransactionId, setEditingTransactionId] = useState(null);
 
   // Form Fields
   const [formType, setFormType] = useState("expense");
@@ -275,6 +277,7 @@ export default function BudgetPlannerTab({
   const filteredLedger = useMemo(() => {
     return monthlyTransactions.filter((tx) => {
       if (typeFilter !== "all" && tx.type !== typeFilter) return false;
+      if (categoryFilter !== "all" && tx.categoryId !== categoryFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const noteMatch = tx.note?.toLowerCase().includes(q);
@@ -284,31 +287,80 @@ export default function BudgetPlannerTab({
       }
       return true;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [monthlyTransactions, typeFilter, searchQuery, categories]);
+  }, [monthlyTransactions, typeFilter, categoryFilter, searchQuery, categories]);
 
-  // Handlers for Adding Transactions
+  // Open modal for Logging a New Transaction
+  const openNewTransactionModal = (type = "expense", prefillCatId = null) => {
+    setEditingTransactionId(null);
+    setFormType(type);
+    setFormCategory(
+      prefillCatId ||
+      (type === "income" ? incomeCategories[0]?.id || "trading_profit" : expenseCategories[0]?.id || "housing")
+    );
+    setFormAccount("bank1");
+    setFormTargetAccount("cash");
+    setFormAmount("");
+    setFormDate(new Date().toISOString().split("T")[0]);
+    setFormNote("");
+    setActiveModal(type);
+  };
+
+  // Open modal for Editing an Existing Transaction
+  const openEditTransactionModal = (tx) => {
+    setEditingTransactionId(tx.id);
+    setFormType(tx.type);
+    setFormCategory(tx.categoryId || "");
+    setFormAccount(tx.accountId || "bank1");
+    setFormTargetAccount(tx.targetAccountId || "cash");
+    setFormAmount(String(tx.amount || ""));
+    setFormDate(tx.date || new Date().toISOString().split("T")[0]);
+    setFormNote(tx.note || "");
+    setActiveModal(tx.type);
+  };
+
+  // Handlers for Adding & Editing Transactions
   const handleSaveTransaction = (e) => {
     e.preventDefault();
     const amt = parseFloat(formAmount);
     if (!amt || amt <= 0) return;
 
-    const newTx = {
-      id: "tx_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
-      date: formDate,
-      type: formType,
-      categoryId: formType === "transfer" ? "transfer" : formCategory || (formType === "income" ? "other_income" : "lifestyle"),
-      amount: amt,
-      accountId: formAccount,
-      targetAccountId: formType === "transfer" ? formTargetAccount : null,
-      note: formNote.trim(),
-    };
+    if (editingTransactionId) {
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === editingTransactionId
+            ? {
+                ...tx,
+                date: formDate,
+                type: formType,
+                categoryId: formType === "transfer" ? "transfer" : formCategory || (formType === "income" ? "other_income" : "lifestyle"),
+                amount: amt,
+                accountId: formAccount,
+                targetAccountId: formType === "transfer" ? formTargetAccount : null,
+                note: formNote.trim(),
+              }
+            : tx
+        )
+      );
+    } else {
+      const newTx = {
+        id: "tx_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+        date: formDate,
+        type: formType,
+        categoryId: formType === "transfer" ? "transfer" : formCategory || (formType === "income" ? "other_income" : "lifestyle"),
+        amount: amt,
+        accountId: formAccount,
+        targetAccountId: formType === "transfer" ? formTargetAccount : null,
+        note: formNote.trim(),
+      };
+      setTransactions((prev) => [newTx, ...prev]);
+    }
 
-    setTransactions((prev) => [newTx, ...prev]);
     setActiveModal(null);
     resetForm();
   };
 
   const resetForm = () => {
+    setEditingTransactionId(null);
     setFormAmount("");
     setFormNote("");
     setFormCategory("");
@@ -468,6 +520,7 @@ export default function BudgetPlannerTab({
       return;
     }
 
+    setEditingTransactionId(null);
     setFormType("income");
     setFormCategory("trading_profit");
     setFormAccount("bank1");
@@ -767,11 +820,7 @@ export default function BudgetPlannerTab({
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
-              onClick={() => {
-                setFormType("income");
-                setFormCategory(incomeCategories[0]?.id || "trading_profit");
-                setActiveModal("income");
-              }}
+              onClick={() => openNewTransactionModal("income")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -790,11 +839,7 @@ export default function BudgetPlannerTab({
             </button>
 
             <button
-              onClick={() => {
-                setFormType("expense");
-                setFormCategory(expenseCategories[0]?.id || "housing");
-                setActiveModal("expense");
-              }}
+              onClick={() => openNewTransactionModal("expense")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -813,10 +858,7 @@ export default function BudgetPlannerTab({
             </button>
 
             <button
-              onClick={() => {
-                setFormType("transfer");
-                setActiveModal("transfer");
-              }}
+              onClick={() => openNewTransactionModal("transfer")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -962,11 +1004,7 @@ export default function BudgetPlannerTab({
                 + Stream
               </button>
               <button
-                onClick={() => {
-                  setFormType("income");
-                  setFormCategory(incomeCategories[0]?.id || "trading_profit");
-                  setActiveModal("income");
-                }}
+                onClick={() => openNewTransactionModal("income")}
                 style={{
                   background: "var(--color-win-soft)", border: "1px solid var(--color-win-border)",
                   color: "var(--color-win-text)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
@@ -1326,6 +1364,16 @@ export default function BudgetPlannerTab({
               </button>
 
               <button
+                onClick={() => openNewTransactionModal("expense")}
+                style={{
+                  background: "var(--color-loss-soft)", border: "1px solid var(--color-loss-border)",
+                  color: "var(--color-loss-text)", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 650, cursor: "pointer"
+                }}
+              >
+                + Outflow
+              </button>
+
+              <button
                 onClick={handleResetCategories}
                 style={{
                   background: "transparent", border: "1px solid var(--border-subtle)",
@@ -1489,6 +1537,30 @@ export default function BudgetPlannerTab({
               <option value="income">Incomes Only</option>
               <option value="transfer">Transfers Only</option>
             </select>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: 11.5,
+                fontWeight: 600,
+                padding: "4px 8px",
+                borderRadius: 6,
+                minHeight: "auto",
+                cursor: "pointer",
+                maxWidth: 160,
+              }}
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.emoji} {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -1605,13 +1677,22 @@ export default function BudgetPlannerTab({
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setDeleteConfirmId(tx.id)}
-                            style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 2 }}
-                            title="Delete Transaction"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                            <button
+                              onClick={() => openEditTransactionModal(tx)}
+                              style={{ background: "none", border: "none", color: "var(--color-gold)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
+                              title="Edit Transaction"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(tx.id)}
+                              style={{ background: "none", border: "none", color: "var(--color-loss-text)", cursor: "pointer", padding: 2, display: "inline-flex", alignItems: "center" }}
+                              title="Delete Transaction"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -1648,13 +1729,24 @@ export default function BudgetPlannerTab({
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
-                {activeModal === "income" && "💰 Log Income Stream"}
-                {activeModal === "expense" && "💳 Log Expense Outflow"}
-                {activeModal === "transfer" && "⇄ Transfer Between Accounts"}
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 6 }}>
+                {editingTransactionId ? (
+                  <span>
+                    ✏️ Edit {activeModal === "income" ? "Income Record" : activeModal === "expense" ? "Expense Record" : "Account Transfer"}
+                  </span>
+                ) : (
+                  <span>
+                    {activeModal === "income" && "💰 Log Income Stream"}
+                    {activeModal === "expense" && "💳 Log Expense Outflow"}
+                    {activeModal === "transfer" && "⇄ Transfer Between Accounts"}
+                  </span>
+                )}
               </div>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={() => {
+                  setActiveModal(null);
+                  resetForm();
+                }}
                 style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
               >
                 <X size={18} />
@@ -1662,6 +1754,65 @@ export default function BudgetPlannerTab({
             </div>
 
             <form onSubmit={handleSaveTransaction} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Type Switcher (Income vs Expense) */}
+              {activeModal !== "transfer" && (
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 650, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6, display: "block" }}>
+                    Transaction Type
+                  </label>
+                  <div style={{ display: "flex", background: "var(--bg-elevated)", padding: 3, borderRadius: 8, gap: 4, border: "1px solid var(--border-subtle)" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormType("income");
+                        setActiveModal("income");
+                        if (!incomeCategories.some((c) => c.id === formCategory)) {
+                          setFormCategory(incomeCategories[0]?.id || "trading_profit");
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: formType === "income" ? "var(--color-win-soft)" : "transparent",
+                        color: formType === "income" ? "var(--color-win-text)" : "var(--text-muted)",
+                        fontWeight: formType === "income" ? 700 : 500,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      💰 Income
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormType("expense");
+                        setActiveModal("expense");
+                        if (!expenseCategories.some((c) => c.id === formCategory)) {
+                          setFormCategory(expenseCategories[0]?.id || "housing");
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: formType === "expense" ? "var(--color-loss-soft)" : "transparent",
+                        color: formType === "expense" ? "var(--color-loss-text)" : "var(--text-muted)",
+                        fontWeight: formType === "expense" ? 700 : 500,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      💳 Expense
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Category (for income or expense) */}
               {activeModal !== "transfer" && (
                 <div>
@@ -1676,6 +1827,11 @@ export default function BudgetPlannerTab({
                         {c.emoji} {c.name} {c.type === "expense" && isCategoryInvestment(c) ? "📈 [Compounding Asset]" : ""}
                       </option>
                     ))}
+                    {formCategory && !(activeModal === "income" ? incomeCategories : expenseCategories).some((c) => c.id === formCategory) && (
+                      <option value={formCategory}>
+                        🏷️ {categories.find((c) => c.id === formCategory)?.name || formCategory}
+                      </option>
+                    )}
                   </select>
                   {activeModal === "expense" && isCategoryInvestment(categories.find((c) => c.id === formCategory)) && (
                     <div style={{ fontSize: 11, color: "var(--color-win-text)", marginTop: 5, display: "flex", alignItems: "center", gap: 5 }}>
@@ -1751,38 +1907,71 @@ export default function BudgetPlannerTab({
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    background: "transparent",
-                    border: "1px solid var(--border-subtle)",
-                    color: "var(--text-secondary)",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 8,
-                    background: "var(--color-gold)",
-                    border: "none",
-                    color: "#081022",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  Save Entry
-                </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, flexWrap: "wrap", gap: 10 }}>
+                {editingTransactionId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this recorded transaction?")) {
+                        handleDeleteTransaction(editingTransactionId);
+                        setActiveModal(null);
+                        resetForm();
+                      }
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "var(--color-loss-soft)",
+                      border: "1px solid var(--color-loss-border)",
+                      color: "var(--color-loss-text)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 650,
+                    }}
+                  >
+                    <Trash2 size={13} /> Delete Entry
+                  </button>
+                ) : <div />}
+
+                <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveModal(null);
+                      resetForm();
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      background: "transparent",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "8px 20px",
+                      borderRadius: 8,
+                      background: "var(--color-gold)",
+                      border: "none",
+                      color: "#081022",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {editingTransactionId ? "Update Entry" : "Save Entry"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
