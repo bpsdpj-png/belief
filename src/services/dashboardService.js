@@ -537,10 +537,20 @@ export async function loadBudgetFromCloud() {
   }
 }
 
-export async function persistBudgetToCloud({ transactions, accounts, categories, allocations }) {
+export async function persistBudgetToCloud({ transactions, accounts, categories, allocations, allowEmpty = false }) {
   try {
+    // Safety guard: prevent accidental overwrite if incoming transactions is empty but cloud has data
+    let safeTransactions = transactions || [];
+    if (safeTransactions.length === 0 && !allowEmpty) {
+      const existing = await loadBudgetFromCloud();
+      if (existing && Array.isArray(existing.transactions) && existing.transactions.length > 0) {
+        console.warn('Prevented accidental overwrite of existing cloud transactions with empty array');
+        safeTransactions = existing.transactions;
+      }
+    }
+
     const payload = {
-      transactions: transactions || [],
+      transactions: safeTransactions,
       accounts: accounts || {},
       categories: categories || [],
       allocations: allocations || {},
@@ -550,7 +560,7 @@ export async function persistBudgetToCloud({ transactions, accounts, categories,
     const { error } = await supabase.from('daily_habits').upsert({
       date: BUDGET_STORE_KEY,
       habits: payload,
-      completed_count: (transactions || []).length,
+      completed_count: safeTransactions.length,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'date' });
 

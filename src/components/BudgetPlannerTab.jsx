@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip
 } from "recharts";
@@ -6,7 +6,7 @@ import {
   Wallet, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Plus, Pencil, Trash2,
   Download, Filter, Search, Calendar, CheckCircle2, AlertTriangle, ShieldCheck,
   Building2, Banknote, Sparkles, PieChart as PieIcon, RefreshCw, X,
-  ChevronLeft, ChevronRight, Upload
+  ChevronLeft, ChevronRight, Upload, Zap
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { loadBudgetFromCloud, persistBudgetToCloud } from "../services/dashboardService";
@@ -204,6 +204,13 @@ export default function BudgetPlannerTab({
   }, [allocations]);
 
   const [cloudSyncStatus, setCloudSyncStatus] = useState("synced"); // "synced" | "saving" | "loading"
+  const hasLoadedCloudRef = useRef(false);
+
+  // Batch Restore / Quick Multi-Category Expense Entry State
+  const [batchMonth, setBatchMonth] = useState("2026-09");
+  const [batchDate, setBatchDate] = useState("2026-09-28");
+  const [batchAccount, setBatchAccount] = useState("bank1");
+  const [batchEntries, setBatchEntries] = useState({});
 
   // 1. Initial Load & Sync from Supabase Cloud on mount
   useEffect(() => {
@@ -212,6 +219,7 @@ export default function BudgetPlannerTab({
       setCloudSyncStatus("loading");
       const cloudData = await loadBudgetFromCloud();
       if (!active || !cloudData) {
+        hasLoadedCloudRef.current = true;
         setCloudSyncStatus("synced");
         return;
       }
@@ -219,19 +227,25 @@ export default function BudgetPlannerTab({
       if (Array.isArray(cloudData.transactions) && cloudData.transactions.length > 0) {
         setTransactions((prev) => {
           if (!prev || prev.length === 0) return cloudData.transactions;
-          const prevIds = new Set(prev.map((t) => t.id));
-          const toAdd = cloudData.transactions.filter((t) => !prevIds.has(t.id));
-          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+          const map = new Map();
+          cloudData.transactions.forEach((t) => { if (t && t.id) map.set(t.id, t); });
+          prev.forEach((t) => { if (t && t.id) map.set(t.id, t); });
+          return Array.from(map.values());
         });
 
         // Switch month to latest available if currently viewing empty month
         const monthsWithData = cloudData.transactions
-          .map((t) => t.date?.slice(0, 7))
+          .map((t) => (t && t.date ? String(t.date).slice(0, 7) : null))
           .filter(Boolean)
           .sort()
           .reverse();
-        if (monthsWithData[0]) {
-          setSelectedMonth(monthsWithData[0]);
+        if (monthsWithData.length > 0) {
+          setSelectedMonth((current) => {
+            const hasDataInCurrent = (cloudData.transactions || []).some(
+              (t) => t && t.date && String(t.date).startsWith(current)
+            );
+            return hasDataInCurrent ? current : monthsWithData[0];
+          });
         }
       }
 
@@ -244,6 +258,7 @@ export default function BudgetPlannerTab({
       if (cloudData.allocations) {
         setAllocations(cloudData.allocations);
       }
+      hasLoadedCloudRef.current = true;
       setCloudSyncStatus("synced");
     };
 
@@ -251,8 +266,9 @@ export default function BudgetPlannerTab({
     return () => { active = false; };
   }, []);
 
-  // 2. Debounced Auto-Save to Supabase Cloud on any budget update
+  // 2. Debounced Auto-Save to Supabase Cloud on any budget update (guarded against pre-load overwrite)
   useEffect(() => {
+    if (!hasLoadedCloudRef.current) return;
     const timer = setTimeout(async () => {
       setCloudSyncStatus("saving");
       await persistBudgetToCloud({ transactions, accounts, categories, allocations });
@@ -261,6 +277,70 @@ export default function BudgetPlannerTab({
 
     return () => clearTimeout(timer);
   }, [transactions, accounts, categories, allocations]);
+
+  // Open Batch Restore / Quick Expense Entry Modal
+  const openBatchRestoreModal = () => {
+    const targetM = availableMonths.includes("2026-09") ? "2026-09" : (selectedMonth || "2026-09");
+    setBatchMonth(targetM);
+    setBatchDate(`${targetM}-28`);
+    setBatchAccount(accounts.bank1 ? "bank1" : Object.keys(accounts)[0] || "bank1");
+    const defaultNotes = {
+      housing: "Rent & Society Maintenance",
+      food: "Monthly Groceries & Ration",
+      transport: "Fuel & Travel",
+      fitness: "Gym / Cricket",
+      trading_overheads: "Data Feeds & Tools",
+      lifestyle: "Dining & Entertainment",
+      health: "Medicines & Healthcare",
+      shopping: "Personal Expenses",
+    };
+    const init = {};
+    expenseCategories.forEach((cat) => {
+      init[cat.id] = { amount: "", note: defaultNotes[cat.id] || cat.name };
+    });
+    setBatchEntries(init);
+    setActiveModal("batch_restore");
+  };
+
+  // Handle Save from Batch Restore Modal
+  const handleSaveBatchRestore = async (e) => {
+    e.preventDefault();
+    const newTxs = [];
+    expenseCategories.forEach((cat) => {
+      const entry = batchEntries[cat.id];
+      const amt = Number(entry?.amount);
+      if (amt && amt > 0) {
+        newTxs.push({
+          id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${cat.id}`,
+          date: batchDate || `${batchMonth}-28`,
+          type: "expense",
+          categoryId: cat.id,
+          amount: amt,
+          accountId: batchAccount,
+          note: entry.note?.trim() || cat.name,
+        });
+      }
+    });
+
+    if (newTxs.length === 0) {
+      alert("Please enter an amount for at least one category.");
+      return;
+    }
+
+    const updatedTxs = [...transactions, ...newTxs];
+    setTransactions(updatedTxs);
+    setSelectedMonth(batchMonth);
+    setActiveModal(null);
+
+    setCloudSyncStatus("saving");
+    await persistBudgetToCloud({
+      transactions: updatedTxs,
+      accounts,
+      categories,
+      allocations,
+    });
+    setCloudSyncStatus("synced");
+  };
 
   // Compute Live Account Balances across all time
   const accountBalances = useMemo(() => {
@@ -953,6 +1033,27 @@ export default function BudgetPlannerTab({
               style={{ display: "none" }}
             />
           </label>
+
+          <button
+            type="button"
+            onClick={openBatchRestoreModal}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 12px",
+              borderRadius: 8,
+              background: "rgba(229, 184, 105, 0.15)",
+              border: "1px solid var(--color-gold-border)",
+              color: "var(--color-gold)",
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+            title="Batch enter or quickly restore multiple expenses for September or any month"
+          >
+            <Zap size={12} /> Quick Restore
+          </button>
         </div>
       </div>
 
@@ -979,23 +1080,43 @@ export default function BudgetPlannerTab({
               ({availableMonths.join(", ")}).
             </span>
           </div>
-          {availableMonths.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {availableMonths.length > 0 && (
+              <button
+                onClick={() => setSelectedMonth(availableMonths[0])}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  background: "var(--color-gold)",
+                  color: "#081022",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Switch to {availableMonths[0]} ({transactions.filter(t => t.date?.startsWith(availableMonths[0])).length} entries) ➔
+              </button>
+            )}
             <button
-              onClick={() => setSelectedMonth(availableMonths[0])}
+              onClick={openBatchRestoreModal}
               style={{
-                padding: "6px 14px",
+                padding: "6px 12px",
                 borderRadius: 8,
-                background: "var(--color-gold)",
-                color: "#081022",
+                background: "rgba(229, 184, 105, 0.2)",
+                color: "var(--color-gold)",
                 fontWeight: 700,
                 fontSize: 12,
-                border: "none",
+                border: "1px solid var(--color-gold-border)",
                 cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
-              Switch to {availableMonths[0]} ({transactions.filter(t => t.date?.startsWith(availableMonths[0])).length} entries) ➔
+              <Zap size={12} /> Quick Restore Expenses
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -2718,6 +2839,207 @@ export default function BudgetPlannerTab({
                     }}
                   >
                     {editingCategoryId ? "Save Changes" : "Create Category"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 9. MODAL: BATCH ADD / QUICK RESTORE EXPENSES */}
+      {activeModal === "batch_restore" && (
+        <div
+          className="modal-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            className="glass-card mobile-modal"
+            style={{
+              width: "100%",
+              maxWidth: 580,
+              padding: 24,
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 12 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>⚡</span>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-main)" }}>
+                    Quick Expense Entry / Restore
+                  </div>
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
+                  Fill spent amounts for multiple categories in one screen. Saved permanently to Supabase Cloud.
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBatchRestore} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Controls: Target Month, Date, Account */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, background: "var(--bg-elevated)", padding: 12, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                <div>
+                  <label style={{ fontSize: 11, marginBottom: 4, display: "block", color: "var(--text-muted)" }}>Target Month</label>
+                  <input
+                    type="month"
+                    value={batchMonth}
+                    onChange={(e) => {
+                      setBatchMonth(e.target.value);
+                      setBatchDate(`${e.target.value}-28`);
+                    }}
+                    required
+                    style={{ fontSize: 12, padding: "6px 8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, marginBottom: 4, display: "block", color: "var(--text-muted)" }}>Entry Date</label>
+                  <input
+                    type="date"
+                    value={batchDate}
+                    onChange={(e) => setBatchDate(e.target.value)}
+                    required
+                    style={{ fontSize: 12, padding: "6px 8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, marginBottom: 4, display: "block", color: "var(--text-muted)" }}>Paid From</label>
+                  <select
+                    value={batchAccount}
+                    onChange={(e) => setBatchAccount(e.target.value)}
+                    style={{ fontSize: 12, padding: "6px 8px" }}
+                  >
+                    {Object.values(accounts).map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Category rows */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 650, color: "var(--color-gold)", marginBottom: 2 }}>
+                  Enter Spent Amounts (₹):
+                </div>
+
+                {expenseCategories.map((cat) => {
+                  const entry = batchEntries[cat.id] || { amount: "", note: "" };
+                  return (
+                    <div
+                      key={cat.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "160px 120px 1fr",
+                        gap: 8,
+                        alignItems: "center",
+                        padding: "6px 10px",
+                        background: entry.amount ? "rgba(229, 184, 105, 0.08)" : "rgba(255, 255, 255, 0.02)",
+                        borderRadius: 6,
+                        border: entry.amount ? "1px solid var(--color-gold-border)" : "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--text-main)" }}>
+                        <span>{cat.emoji || "🏷️"}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cat.name}>
+                          {cat.name}
+                        </span>
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          placeholder="₹ 0"
+                          value={entry.amount}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBatchEntries((prev) => ({
+                              ...prev,
+                              [cat.id]: { ...(prev[cat.id] || {}), amount: val },
+                            }));
+                          }}
+                          style={{ fontSize: 12, padding: "5px 8px", width: "100%", fontFamily: "var(--font-mono)" }}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Optional note"
+                          value={entry.note}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBatchEntries((prev) => ({
+                              ...prev,
+                              [cat.id]: { ...(prev[cat.id] || {}), note: val },
+                            }));
+                          }}
+                          style={{ fontSize: 11.5, padding: "5px 8px", width: "100%", color: "var(--text-secondary)" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bottom Summary & Actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  Total to save:{" "}
+                  <strong style={{ color: "var(--color-gold)", fontFamily: "var(--font-mono)" }}>
+                    ₹{Object.values(batchEntries).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0).toLocaleString("en-IN")}
+                  </strong>{" "}
+                  across {Object.values(batchEntries).filter((e) => Number(e?.amount) > 0).length} categories
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal(null)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      background: "transparent",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "8px 20px",
+                      borderRadius: 8,
+                      background: "var(--color-gold)",
+                      border: "none",
+                      color: "#081022",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Zap size={14} /> Save All to Cloud
                   </button>
                 </div>
               </div>
