@@ -23,7 +23,8 @@ import {
   persistSettings,
   syncAllToSupabase,
   fetchStockQuote,
-  STOCK_PRICE_CATALOG
+  STOCK_PRICE_CATALOG,
+  persistBudgetToCloud,
 } from "../services/dashboardService";
 import Plan20CrTab from "./Plan20CrTab";
 import DailyHabitsTab from "./DailyHabitsTab";
@@ -1137,9 +1138,28 @@ export default function Dashboard() {
         ledger,
         holdings
       });
+
+      // Also persist Budget Planner data to Supabase Cloud
+      try {
+        const savedTx = localStorage.getItem("belief_budget_tx_v1");
+        const savedAcc = localStorage.getItem("belief_budget_accounts_v1");
+        const savedCat = localStorage.getItem("belief_budget_categories_v1");
+        const savedAlloc = localStorage.getItem("belief_budget_allocations_v1");
+        if (savedTx || savedAcc) {
+          await persistBudgetToCloud({
+            transactions: savedTx ? JSON.parse(savedTx) : [],
+            accounts: savedAcc ? JSON.parse(savedAcc) : null,
+            categories: savedCat ? JSON.parse(savedCat) : null,
+            allocations: savedAlloc ? JSON.parse(savedAlloc) : null,
+          });
+        }
+      } catch (bErr) {
+        console.warn("Could not sync budget data during master sync", bErr);
+      }
+
       if (res.errors.length === 0) {
         setDbStatus(prev => ({ ...prev, tablesReady: true }));
-        alert(`Successfully synced with Supabase Cloud!\n• ${res.trades} trades active\n• ${res.ledger} ledger transactions active\n• ${res.holdings} equity investments active`);
+        alert(`Successfully synced with Supabase Cloud!\n• ${res.trades} trades active\n• ${res.ledger} ledger transactions active\n• ${res.holdings} equity investments active\n• Budget Planner synced to Cloud`);
       } else {
         alert(`Sync warning:\n${res.errors.join('\n')}`);
       }

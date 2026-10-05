@@ -475,6 +475,7 @@ export async function loadDailyHabitsFromDb() {
     const habitMap = {};
     if (data && data.length > 0) {
       data.forEach(row => {
+        if (row.date && row.date.startsWith('__')) return; // ignore internal stores
         habitMap[row.date] = {
           habits: row.habits || {},
           completedCount: row.completed_count || 0,
@@ -508,6 +509,55 @@ export async function persistDailyHabitToDb({ date, habits, completedCount }) {
     return { error };
   } catch (e) {
     console.warn('Network error saving habit:', e);
+    return { error: e };
+  }
+}
+
+// ==============================================================================
+// BUDGET PLANNER CLOUD SYNC & PERSISTENCE
+// ==============================================================================
+const BUDGET_STORE_KEY = '__belief_budget_store__';
+
+export async function loadBudgetFromCloud() {
+  try {
+    const { data, error } = await supabase
+      .from('daily_habits')
+      .select('habits')
+      .eq('date', BUDGET_STORE_KEY)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Could not load budget from Supabase:', error.message);
+      return null;
+    }
+    return data?.habits || null;
+  } catch (e) {
+    console.warn('Network error loading budget from Supabase:', e);
+    return null;
+  }
+}
+
+export async function persistBudgetToCloud({ transactions, accounts, categories, allocations }) {
+  try {
+    const payload = {
+      transactions: transactions || [],
+      accounts: accounts || {},
+      categories: categories || [],
+      allocations: allocations || {},
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('daily_habits').upsert({
+      date: BUDGET_STORE_KEY,
+      habits: payload,
+      completed_count: (transactions || []).length,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'date' });
+
+    if (error) console.warn('Failed to upsert budget to Supabase:', error.message);
+    return { error };
+  } catch (e) {
+    console.warn('Network error saving budget to Supabase:', e);
     return { error: e };
   }
 }

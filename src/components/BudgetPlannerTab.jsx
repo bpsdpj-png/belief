@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Upload
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { loadBudgetFromCloud, persistBudgetToCloud } from "../services/dashboardService";
 
 const DEFAULT_ACCOUNTS = {
   bank1: { id: "bank1", name: "Primary Bank 1", openingBalance: 150000, color: "var(--color-win-text)" },
@@ -201,6 +202,65 @@ export default function BudgetPlannerTab({
   useEffect(() => {
     localStorage.setItem("belief_budget_allocations_v1", JSON.stringify(allocations));
   }, [allocations]);
+
+  const [cloudSyncStatus, setCloudSyncStatus] = useState("synced"); // "synced" | "saving" | "loading"
+
+  // 1. Initial Load & Sync from Supabase Cloud on mount
+  useEffect(() => {
+    let active = true;
+    const fetchCloud = async () => {
+      setCloudSyncStatus("loading");
+      const cloudData = await loadBudgetFromCloud();
+      if (!active || !cloudData) {
+        setCloudSyncStatus("synced");
+        return;
+      }
+
+      if (Array.isArray(cloudData.transactions) && cloudData.transactions.length > 0) {
+        setTransactions((prev) => {
+          if (!prev || prev.length === 0) return cloudData.transactions;
+          const prevIds = new Set(prev.map((t) => t.id));
+          const toAdd = cloudData.transactions.filter((t) => !prevIds.has(t.id));
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+        });
+
+        // Switch month to latest available if currently viewing empty month
+        const monthsWithData = cloudData.transactions
+          .map((t) => t.date?.slice(0, 7))
+          .filter(Boolean)
+          .sort()
+          .reverse();
+        if (monthsWithData[0]) {
+          setSelectedMonth(monthsWithData[0]);
+        }
+      }
+
+      if (cloudData.accounts) {
+        setAccounts((prev) => ({ ...prev, ...cloudData.accounts }));
+      }
+      if (Array.isArray(cloudData.categories) && cloudData.categories.length > 0) {
+        setCategories(cloudData.categories);
+      }
+      if (cloudData.allocations) {
+        setAllocations(cloudData.allocations);
+      }
+      setCloudSyncStatus("synced");
+    };
+
+    fetchCloud();
+    return () => { active = false; };
+  }, []);
+
+  // 2. Debounced Auto-Save to Supabase Cloud on any budget update
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setCloudSyncStatus("saving");
+      await persistBudgetToCloud({ transactions, accounts, categories, allocations });
+      setCloudSyncStatus("synced");
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [transactions, accounts, categories, allocations]);
 
   // Compute Live Account Balances across all time
   const accountBalances = useMemo(() => {
@@ -722,6 +782,24 @@ export default function BudgetPlannerTab({
               }}
             >
               2 BANKS + CASH LIQUID TRACKER
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 650,
+                padding: "2px 8px",
+                borderRadius: 20,
+                background: "var(--color-win-soft)",
+                color: "var(--color-win-text)",
+                border: "1px solid var(--color-win-border)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+              title="Budget transactions and allocations automatically sync with Supabase Cloud"
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-win)", boxShadow: "0 0 6px var(--color-win)" }} />
+              {cloudSyncStatus === "saving" ? "Cloud Saving..." : cloudSyncStatus === "loading" ? "Cloud Syncing..." : "Supabase Cloud"}
             </span>
           </div>
           <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
