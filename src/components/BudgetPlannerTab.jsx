@@ -5,7 +5,8 @@ import {
 import {
   Wallet, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Plus, Pencil, Trash2,
   Download, Filter, Search, Calendar, CheckCircle2, AlertTriangle, ShieldCheck,
-  Building2, Banknote, Sparkles, PieChart as PieIcon, RefreshCw, X
+  Building2, Banknote, Sparkles, PieChart as PieIcon, RefreshCw, X,
+  ChevronLeft, ChevronRight, Upload
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -121,11 +122,35 @@ export default function BudgetPlannerTab({
     }
   });
 
+  const currentCalendarMonth = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
   // Filters & Controls
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    try {
+      const savedTx = localStorage.getItem("belief_budget_tx_v1");
+      if (savedTx) {
+        const parsed = JSON.parse(savedTx);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasCurrentMonth = parsed.some((t) => t.date && t.date.startsWith(currentMonthStr));
+          if (hasCurrentMonth) return currentMonthStr;
+          // Find latest month with transactions
+          const dates = parsed.map((t) => t.date).filter(Boolean).sort().reverse();
+          if (dates[0] && dates[0].length >= 7) {
+            return dates[0].slice(0, 7);
+          }
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return currentMonthStr;
   });
+  const [ledgerScope, setLedgerScope] = useState("month"); // "month" | "all"
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -273,9 +298,38 @@ export default function BudgetPlannerTab({
     };
   }, [monthlyTransactions, allocations, categories]);
 
+  // Available months with recorded transactions
+  const availableMonths = useMemo(() => {
+    const set = new Set();
+    transactions.forEach((tx) => {
+      if (tx.date && tx.date.length >= 7) {
+        set.add(tx.date.slice(0, 7));
+      }
+    });
+    return Array.from(set).sort().reverse();
+  }, [transactions]);
+
+  // Month navigation helpers
+  const handlePrevMonth = () => {
+    const [y, m] = (selectedMonth || currentCalendarMonth).split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = (selectedMonth || currentCalendarMonth).split("-").map(Number);
+    const d = new Date(y, m, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const handleJumpToCurrentMonth = () => {
+    setSelectedMonth(currentCalendarMonth);
+  };
+
   // Filtered transactions for the ledger table
   const filteredLedger = useMemo(() => {
-    return monthlyTransactions.filter((tx) => {
+    const baseList = ledgerScope === "all" ? transactions : monthlyTransactions;
+    return baseList.filter((tx) => {
       if (typeFilter !== "all" && tx.type !== typeFilter) return false;
       if (categoryFilter !== "all" && tx.categoryId !== categoryFilter) return false;
       if (searchQuery) {
@@ -287,7 +341,7 @@ export default function BudgetPlannerTab({
       }
       return true;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [monthlyTransactions, typeFilter, categoryFilter, searchQuery, categories]);
+  }, [ledgerScope, transactions, monthlyTransactions, typeFilter, categoryFilter, searchQuery, categories]);
 
   // Open modal for Logging a New Transaction
   const openNewTransactionModal = (type = "expense", prefillCatId = null) => {
@@ -550,6 +604,48 @@ export default function BudgetPlannerTab({
     XLSX.writeFile(wb, `Bharat_Budget_${selectedMonth}.xlsx`);
   };
 
+  // Full JSON Backup & Restore for Budget Data
+  const handleBackupJSON = () => {
+    const backupData = {
+      app: "Belief Budget Planner",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      accounts,
+      categories,
+      allocations,
+      transactions,
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Belief_Budget_Backup_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreJSON = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (Array.isArray(data.transactions)) {
+          setTransactions(data.transactions);
+        }
+        if (data.accounts) setAccounts(data.accounts);
+        if (data.categories) setCategories(data.categories);
+        if (data.allocations) setAllocations(data.allocations);
+        alert(`Successfully restored ${data.transactions?.length || 0} transactions!`);
+      } catch (err) {
+        alert("Failed to parse backup JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const fmtINR = (val) => "₹" + Math.abs(val || 0).toLocaleString("en-IN");
   const fmtSigned = (val) => (val >= 0 ? "+" : "-") + "₹" + Math.abs(val || 0).toLocaleString("en-IN");
 
@@ -634,28 +730,67 @@ export default function BudgetPlannerTab({
         </div>
 
         {/* Month Selector & Quick Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--bg-elevated)", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-            <Calendar size={13} color="var(--color-gold)" />
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Month Stepper (Prev, Input, Next) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--bg-elevated)", padding: "3px 6px", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              title="Previous Month"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "3px 4px" }}
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <Calendar size={13} color="var(--color-gold)" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-main)",
+                  fontSize: 12.5,
+                  fontWeight: 650,
+                  fontFamily: "var(--font-mono)",
+                  padding: 0,
+                  outline: "none",
+                  minHeight: "auto",
+                  width: 120,
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              title="Next Month"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "3px 4px" }}
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {selectedMonth !== currentCalendarMonth && (
+            <button
+              type="button"
+              onClick={handleJumpToCurrentMonth}
               style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-main)",
-                fontSize: 12.5,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--color-gold)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 11,
                 fontWeight: 650,
-                fontFamily: "var(--font-mono)",
-                padding: 0,
-                outline: "none",
-                minHeight: "auto",
-                width: 125,
                 cursor: "pointer",
               }}
-            />
-          </div>
+              title="Jump to current calendar month"
+            >
+              Current Month
+            </button>
+          )}
 
           <button
             onClick={handleSyncTradingProfit}
@@ -693,10 +828,98 @@ export default function BudgetPlannerTab({
               cursor: "pointer",
             }}
           >
-            <Download size={12} /> Export Excel
+            <Download size={12} /> Excel
           </button>
+
+          <button
+            onClick={handleBackupJSON}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 12px",
+              borderRadius: 8,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-main)",
+              fontSize: 11.5,
+              fontWeight: 650,
+              cursor: "pointer",
+            }}
+            title="Download full JSON backup of all budget transactions, accounts, and categories"
+          >
+            <Download size={12} /> Backup
+          </button>
+
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 12px",
+              borderRadius: 8,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-main)",
+              fontSize: 11.5,
+              fontWeight: 650,
+              cursor: "pointer",
+            }}
+            title="Restore budget data from a previously downloaded JSON backup file"
+          >
+            <Upload size={12} /> Restore
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleRestoreJSON}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
       </div>
+
+      {/* Notice Banner when viewing an empty month but previous months have recorded transactions */}
+      {monthlyTransactions.length === 0 && transactions.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(229, 184, 105, 0.12)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: 10,
+            padding: "12px 18px",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-main)" }}>
+            <span style={{ fontSize: 18 }}>💡</span>
+            <span>
+              <strong>Viewing {selectedMonth}:</strong> No transactions logged for this month yet. You have{" "}
+              <strong style={{ color: "var(--color-gold)" }}>{transactions.length}</strong> recorded transaction(s) in earlier months{" "}
+              ({availableMonths.join(", ")}).
+            </span>
+          </div>
+          {availableMonths.length > 0 && (
+            <button
+              onClick={() => setSelectedMonth(availableMonths[0])}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 8,
+                background: "var(--color-gold)",
+                color: "#081022",
+                fontWeight: 700,
+                fontSize: 12,
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Switch to {availableMonths[0]} ({transactions.filter(t => t.date?.startsWith(availableMonths[0])).length} entries) ➔
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. Top Row: 4 Master Telemetry KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
@@ -1491,7 +1714,7 @@ export default function BudgetPlannerTab({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Monthly Transaction Ledger ({filteredLedger.length})
+              {ledgerScope === "all" ? "All-Time" : "Monthly"} Transaction Ledger ({filteredLedger.length})
             </span>
           </div>
 
@@ -1516,6 +1739,25 @@ export default function BudgetPlannerTab({
                 }}
               />
             </div>
+
+            <select
+              value={ledgerScope}
+              onChange={(e) => setLedgerScope(e.target.value)}
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: 11.5,
+                fontWeight: 650,
+                padding: "4px 8px",
+                borderRadius: 6,
+                minHeight: "auto",
+                cursor: "pointer",
+              }}
+            >
+              <option value="month">Month: {selectedMonth}</option>
+              <option value="all">All Months ({transactions.length})</option>
+            </select>
 
             <select
               value={typeFilter}
@@ -1582,7 +1824,46 @@ export default function BudgetPlannerTab({
               {filteredLedger.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>
-                    No transactions recorded for {selectedMonth}. Click "+ Log Income", "+ Log Expense", or "+ Transfer" above to begin.
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                      <div>No transactions recorded for {ledgerScope === "all" ? "the selected filters" : selectedMonth}.</div>
+                      {ledgerScope === "month" && transactions.length > 0 && availableMonths.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                          <span>You have {transactions.length} transaction(s) recorded in other months:</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMonth(availableMonths[0])}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              background: "var(--color-gold)",
+                              color: "#081022",
+                              fontWeight: 700,
+                              fontSize: 11.5,
+                              border: "none",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Switch to {availableMonths[0]}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLedgerScope("all")}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              background: "var(--bg-elevated)",
+                              color: "var(--text-main)",
+                              border: "1px solid var(--border-subtle)",
+                              fontWeight: 600,
+                              fontSize: 11.5,
+                              cursor: "pointer",
+                            }}
+                          >
+                            View All Months
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
